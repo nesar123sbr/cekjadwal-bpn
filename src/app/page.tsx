@@ -15,7 +15,8 @@ export default function Home() {
         <header className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">CekJadwal BPN</h1>
           <p className="mt-2 text-sm text-gray-600">
-            Masukkan nomor berkas untuk melihat jadwal pengukuran lapangan.
+            Masukkan nomor tiket dan nama pemohon untuk melihat status berkas
+            sebelum nomor berkas resmi terbit.
           </p>
         </header>
         <SearchForm onResult={setResult} />

@@ -1,19 +1,24 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { createApplication } from "@/actions/application";
+import { createApplication, updateMissingDocs } from "@/actions/application";
 import {
   createSchedule,
   markApplicationComplete,
   updateSchedule,
 } from "@/actions/schedule";
+import type { ApplicationStatus } from "@/db/schema";
 
 export type AdminRow = {
   id: string;
-  fileNumber: string;
+  ticketNumber: string;
   applicantName: string;
   address: string;
-  status: string;
+  status: ApplicationStatus;
+  missingDocuments: string | null;
+  officialFileNumber: string | null;
+  daysInProcess: number;
+  daysInStage: number;
   inspectionDate: string | null;
   inspectionTime: string | null;
   notes: string | null;
@@ -23,8 +28,16 @@ export type AdminRow = {
 
 export type OfficerOption = { id: string; name: string; position: string };
 
-const STATUS_STYLE: Record<string, string> = {
-  BELUM_DIJADWALKAN: "bg-amber-100 text-amber-800",
+const STATUS_LABEL: Record<ApplicationStatus, string> = {
+  MENUNGGU_DOKUMEN: "Menunggu Dokumen",
+  VERIFIKASI_PETUGAS: "Verifikasi Petugas",
+  DIJADWALKAN: "Dijadwalkan",
+  SELESAI: "Selesai",
+};
+
+const STATUS_STYLE: Record<ApplicationStatus, string> = {
+  MENUNGGU_DOKUMEN: "bg-red-100 text-red-800",
+  VERIFIKASI_PETUGAS: "bg-amber-100 text-amber-800",
   DIJADWALKAN: "bg-green-100 text-green-800",
   SELESAI: "bg-emerald-100 text-emerald-800",
 };
@@ -33,6 +46,23 @@ const DEFAULT_NOTES = "Harap patok batas terpasang";
 const inputCls =
   "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900";
 
+type Dialog =
+  | { kind: "schedule"; row: AdminRow; edit: boolean }
+  | { kind: "docs"; row: AdminRow }
+  | { kind: "complete"; row: AdminRow }
+  | { kind: "new" }
+  | null;
+
+function Blocker({ row }: { row: AdminRow }) {
+  if (row.status === "MENUNGGU_DOKUMEN") {
+    return <span className="text-red-700">Menunggu pemohon · {row.daysInStage} hari</span>;
+  }
+  if (row.status === "VERIFIKASI_PETUGAS") {
+    return <span className="text-amber-700">Antrean petugas · {row.daysInStage} hari</span>;
+  }
+  return <span className="text-gray-400">-</span>;
+}
+
 export default function AdminTable({
   rows,
   officers,
@@ -40,95 +70,115 @@ export default function AdminTable({
   rows: AdminRow[];
   officers: OfficerOption[];
 }) {
-  // Modal jadwal (buat / ubah)
-  const [target, setTarget] = useState<AdminRow | null>(null);
-  const [isEdit, setIsEdit] = useState(false);
+  const [dialog, setDialog] = useState<Dialog>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  // Form schedule
   const [date, setDate] = useState("");
   const [time, setTime] = useState("09:00");
   const [notes, setNotes] = useState(DEFAULT_NOTES);
   const [selected, setSelected] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
 
-  // Modal berkas baru
-  const [showNew, setShowNew] = useState(false);
-  const [fileNumber, setFileNumber] = useState("");
+  // Form berkas baru
+  const [ticketNumber, setTicketNumber] = useState("");
   const [applicantName, setApplicantName] = useState("");
   const [objectAddress, setObjectAddress] = useState("");
-  const [newError, setNewError] = useState<string | null>(null);
 
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  // Form dokumen kurang / nomor resmi
+  const [docs, setDocs] = useState("");
+  const [officialNumber, setOfficialNumber] = useState("");
+
+  function close() {
+    setDialog(null);
+    setError(null);
+  }
 
   function openSchedule(row: AdminRow, edit: boolean) {
-    setTarget(row);
-    setIsEdit(edit);
     setDate(edit ? (row.inspectionDate ?? "") : "");
     setTime(edit ? (row.inspectionTime ?? "09:00") : "09:00");
     setNotes(edit ? (row.notes ?? "") : DEFAULT_NOTES);
     setSelected(edit ? row.officerIds : []);
     setError(null);
+    setDialog({ kind: "schedule", row, edit });
+  }
+
+  function openDocs(row: AdminRow) {
+    setDocs(row.missingDocuments ?? "");
+    setError(null);
+    setDialog({ kind: "docs", row });
+  }
+
+  function openComplete(row: AdminRow) {
+    setOfficialNumber("");
+    setError(null);
+    setDialog({ kind: "complete", row });
+  }
+
+  function openNew() {
+    setTicketNumber("");
+    setApplicantName("");
+    setObjectAddress("");
+    setError(null);
+    setDialog({ kind: "new" });
   }
 
   function toggle(id: string) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
 
-  function submitSchedule(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!target) return;
-    if (!date) return setError("Tanggal pemeriksaan wajib diisi.");
-    if (!time) return setError("Jam pemeriksaan wajib diisi.");
-    if (selected.length === 0) return setError("Pilih minimal satu petugas.");
-    setError(null);
+  function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>) {
     startTransition(async () => {
-      const payload = {
-        applicationId: target.id,
-        inspectionDate: date,
-        inspectionTime: time,
-        notes,
-        officerIds: selected,
-      };
-      const res = isEdit
-        ? await updateSchedule(payload)
-        : await createSchedule(payload);
-      if (res.ok) setTarget(null);
+      const res = await fn();
+      if (res.ok) close();
       else setError(res.error);
     });
   }
 
-  function openNew() {
-    setFileNumber("");
-    setApplicantName("");
-    setObjectAddress("");
-    setNewError(null);
-    setShowNew(true);
+  function submitSchedule(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (dialog?.kind !== "schedule") return;
+    if (!date) return setError("Tanggal pemeriksaan wajib diisi.");
+    if (!time) return setError("Jam pemeriksaan wajib diisi.");
+    if (selected.length === 0) return setError("Pilih minimal satu petugas.");
+    setError(null);
+    const payload = {
+      applicationId: dialog.row.id,
+      inspectionDate: date,
+      inspectionTime: time,
+      notes,
+      officerIds: selected,
+    };
+    run(() => (dialog.edit ? updateSchedule(payload) : createSchedule(payload)));
   }
 
   function submitNew(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!fileNumber.trim() || !applicantName.trim() || !objectAddress.trim()) {
-      return setNewError("Semua kolom wajib diisi.");
+    if (!ticketNumber.trim() || !applicantName.trim() || !objectAddress.trim()) {
+      return setError("Semua kolom wajib diisi.");
     }
-    setNewError(null);
-    startTransition(async () => {
-      const res = await createApplication({
-        fileNumber,
-        applicantName,
-        objectAddress,
-      });
-      if (res.ok) setShowNew(false);
-      else setNewError(res.error);
-    });
+    setError(null);
+    run(() => createApplication({ ticketNumber, applicantName, objectAddress }));
   }
 
-  function complete(row: AdminRow) {
-    if (!window.confirm(`Tandai berkas ${row.fileNumber} sebagai selesai?`)) return;
-    setActionError(null);
-    startTransition(async () => {
-      const res = await markApplicationComplete(row.id);
-      if (!res.ok) setActionError(res.error);
-    });
+  function submitDocs(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (dialog?.kind !== "docs") return;
+    setError(null);
+    run(() => updateMissingDocs(dialog.row.id, docs));
   }
+
+  function submitComplete(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (dialog?.kind !== "complete") return;
+    if (!officialNumber.trim()) {
+      return setError("Nomor Berkas Resmi BPN wajib diisi.");
+    }
+    setError(null);
+    run(() => markApplicationComplete(dialog.row.id, officialNumber));
+  }
+
+  const btn = "rounded-lg px-3 py-1.5 text-xs font-semibold";
 
   return (
     <>
@@ -142,20 +192,16 @@ export default function AdminTable({
         </button>
       </div>
 
-      {actionError && (
-        <p role="alert" className="mb-3 text-sm text-red-600">
-          {actionError}
-        </p>
-      )}
-
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-gray-100 text-xs uppercase text-gray-600">
             <tr>
-              <th className="px-4 py-3">No. Berkas</th>
+              <th className="px-4 py-3">No. Tiket</th>
               <th className="px-4 py-3">Nama Pemohon</th>
               <th className="px-4 py-3">Alamat</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Lama Proses</th>
+              <th className="px-4 py-3">Hambatan</th>
               <th className="px-4 py-3">Tanggal Jadwal</th>
               <th className="px-4 py-3">Petugas</th>
               <th className="px-4 py-3">Aksi</th>
@@ -164,24 +210,36 @@ export default function AdminTable({
           <tbody className="divide-y divide-gray-100 text-gray-900">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
+                <td colSpan={9} className="px-4 py-6 text-center text-gray-500">
                   Belum ada berkas.
                 </td>
               </tr>
             )}
             {rows.map((r) => (
               <tr key={r.id} className="align-top">
-                <td className="whitespace-nowrap px-4 py-3 font-medium">{r.fileNumber}</td>
+                <td className="whitespace-nowrap px-4 py-3 font-medium">{r.ticketNumber}</td>
                 <td className="px-4 py-3">{r.applicantName}</td>
                 <td className="px-4 py-3">{r.address}</td>
                 <td className="px-4 py-3">
                   <span
-                    className={`rounded-full px-2 py-1 text-xs font-medium ${
-                      STATUS_STYLE[r.status] ?? "bg-gray-100 text-gray-700"
-                    }`}
+                    className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLE[r.status]}`}
                   >
-                    {r.status.replace("_", " ")}
+                    {STATUS_LABEL[r.status]}
                   </span>
+                  {r.status === "MENUNGGU_DOKUMEN" && r.missingDocuments && (
+                    <p className="mt-1 max-w-xs whitespace-pre-line text-xs text-red-700">
+                      {r.missingDocuments}
+                    </p>
+                  )}
+                  {r.status === "SELESAI" && r.officialFileNumber && (
+                    <p className="mt-1 text-xs text-gray-600">
+                      No. Resmi: <strong>{r.officialFileNumber}</strong>
+                    </p>
+                  )}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3">{r.daysInProcess} hari</td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs">
+                  <Blocker row={r} />
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
                   {r.inspectionDate ? `${r.inspectionDate} ${r.inspectionTime ?? ""} WIB` : "-"}
@@ -190,33 +248,42 @@ export default function AdminTable({
                   {r.officerNames.length ? r.officerNames.join(", ") : "-"}
                 </td>
                 <td className="px-4 py-3">
-                  {r.status === "BELUM_DIJADWALKAN" && (
-                    <button
-                      onClick={() => openSchedule(r, false)}
-                      className="rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800"
-                    >
-                      Atur Jadwal
-                    </button>
-                  )}
-                  {r.status === "DIJADWALKAN" && (
-                    <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {(r.status === "MENUNGGU_DOKUMEN" ||
+                      r.status === "VERIFIKASI_PETUGAS") && (
                       <button
-                        onClick={() => complete(r)}
-                        disabled={pending}
-                        className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                        onClick={() => openDocs(r)}
+                        className={`${btn} bg-red-100 text-red-800 hover:bg-red-200`}
                       >
-                        Selesai
+                        Catat Dokumen Kurang
                       </button>
+                    )}
+                    {r.status === "VERIFIKASI_PETUGAS" && (
                       <button
-                        onClick={() => openSchedule(r, true)}
-                        disabled={pending}
-                        className="rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-300 disabled:opacity-60"
+                        onClick={() => openSchedule(r, false)}
+                        className={`${btn} bg-blue-700 text-white hover:bg-blue-800`}
                       >
-                        Ubah Jadwal
+                        Atur Jadwal
                       </button>
-                    </div>
-                  )}
-                  {r.status === "SELESAI" && <span className="text-gray-400">-</span>}
+                    )}
+                    {r.status === "DIJADWALKAN" && (
+                      <>
+                        <button
+                          onClick={() => openComplete(r)}
+                          className={`${btn} bg-green-600 text-white hover:bg-green-700`}
+                        >
+                          Selesai
+                        </button>
+                        <button
+                          onClick={() => openSchedule(r, true)}
+                          className={`${btn} bg-gray-200 text-gray-800 hover:bg-gray-300`}
+                        >
+                          Ubah Jadwal
+                        </button>
+                      </>
+                    )}
+                    {r.status === "SELESAI" && <span className="text-gray-400">-</span>}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -224,13 +291,12 @@ export default function AdminTable({
         </table>
       </div>
 
-      {target && (
+      {dialog?.kind === "schedule" && (
         <Modal titleId="schedule-title">
           <form onSubmit={submitSchedule} className="space-y-4">
             <h2 id="schedule-title" className="text-lg font-bold text-gray-900">
-              {isEdit ? "Ubah Jadwal" : "Atur Jadwal"} - {target.fileNumber}
+              {dialog.edit ? "Ubah Jadwal" : "Atur Jadwal"} - {dialog.row.ticketNumber}
             </h2>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="date" className="block text-sm font-medium text-gray-700">
@@ -257,7 +323,6 @@ export default function AdminTable({
                 />
               </div>
             </div>
-
             <div>
               <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
                 Catatan untuk Pemohon
@@ -270,7 +335,6 @@ export default function AdminTable({
                 className={inputCls}
               />
             </div>
-
             <fieldset>
               <legend className="text-sm font-medium text-gray-700">Petugas Lapangan</legend>
               <div className="mt-1 space-y-2">
@@ -287,38 +351,32 @@ export default function AdminTable({
                 ))}
               </div>
             </fieldset>
-
-            {error && (
-              <p role="alert" className="text-sm text-red-600">
-                {error}
-              </p>
-            )}
-
-            <ModalButtons
+            <FormFooter
+              error={error}
               pending={pending}
-              submitLabel={isEdit ? "Simpan Perubahan" : "Simpan Jadwal"}
-              onCancel={() => setTarget(null)}
+              submitLabel={dialog.edit ? "Simpan Perubahan" : "Simpan Jadwal"}
+              onCancel={close}
             />
           </form>
         </Modal>
       )}
 
-      {showNew && (
+      {dialog?.kind === "new" && (
         <Modal titleId="new-title">
           <form onSubmit={submitNew} className="space-y-4">
             <h2 id="new-title" className="text-lg font-bold text-gray-900">
               Tambah Berkas Baru
             </h2>
             <div>
-              <label htmlFor="fn" className="block text-sm font-medium text-gray-700">
-                No. Berkas
+              <label htmlFor="tn" className="block text-sm font-medium text-gray-700">
+                No. Tiket / Registrasi
               </label>
               <input
-                id="fn"
+                id="tn"
                 type="text"
-                placeholder="Contoh: 1204/2026"
-                value={fileNumber}
-                onChange={(e) => setFileNumber(e.target.value)}
+                placeholder="Contoh: REG-1204/2026"
+                value={ticketNumber}
+                onChange={(e) => setTicketNumber(e.target.value)}
                 className={inputCls}
               />
             </div>
@@ -347,15 +405,75 @@ export default function AdminTable({
                 className={inputCls}
               />
             </div>
-            {newError && (
-              <p role="alert" className="text-sm text-red-600">
-                {newError}
-              </p>
-            )}
-            <ModalButtons
+            <FormFooter
+              error={error}
               pending={pending}
               submitLabel="Simpan Berkas"
-              onCancel={() => setShowNew(false)}
+              onCancel={close}
+            />
+          </form>
+        </Modal>
+      )}
+
+      {dialog?.kind === "docs" && (
+        <Modal titleId="docs-title">
+          <form onSubmit={submitDocs} className="space-y-4">
+            <h2 id="docs-title" className="text-lg font-bold text-gray-900">
+              Catat Dokumen Kurang - {dialog.row.ticketNumber}
+            </h2>
+            <div>
+              <label htmlFor="docs" className="block text-sm font-medium text-gray-700">
+                Dokumen yang kurang (satu per baris)
+              </label>
+              <textarea
+                id="docs"
+                rows={5}
+                placeholder={"FC KTP batas tanah sebelah utara\nSurat sporadik belum ttd kades"}
+                value={docs}
+                onChange={(e) => setDocs(e.target.value)}
+                className={inputCls}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Kosongkan jika dokumen sudah lengkap; berkas akan masuk antrean verifikasi petugas.
+              </p>
+            </div>
+            <FormFooter
+              error={error}
+              pending={pending}
+              submitLabel="Simpan Catatan"
+              onCancel={close}
+            />
+          </form>
+        </Modal>
+      )}
+
+      {dialog?.kind === "complete" && (
+        <Modal titleId="complete-title">
+          <form onSubmit={submitComplete} className="space-y-4">
+            <h2 id="complete-title" className="text-lg font-bold text-gray-900">
+              Tandai Selesai - {dialog.row.ticketNumber}
+            </h2>
+            <div>
+              <label htmlFor="official" className="block text-sm font-medium text-gray-700">
+                Nomor Berkas Resmi BPN
+              </label>
+              <input
+                id="official"
+                type="text"
+                placeholder="Contoh: 1201/2026"
+                value={officialNumber}
+                onChange={(e) => setOfficialNumber(e.target.value)}
+                className={inputCls}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Nomor dari aplikasi Sentuh Tanahku. Akan ditampilkan kepada pemohon.
+              </p>
+            </div>
+            <FormFooter
+              error={error}
+              pending={pending}
+              submitLabel="Tandai Selesai"
+              onCancel={close}
             />
           </form>
         </Modal>
@@ -385,32 +503,41 @@ function Modal({
   );
 }
 
-function ModalButtons({
+function FormFooter({
+  error,
   pending,
   submitLabel,
   onCancel,
 }: {
+  error: string | null;
   pending: boolean;
   submitLabel: string;
   onCancel: () => void;
 }) {
   return (
-    <div className="flex justify-end gap-2">
-      <button
-        type="button"
-        onClick={onCancel}
-        disabled={pending}
-        className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700"
-      >
-        Batal
-      </button>
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
-      >
-        {pending ? "Menyimpan..." : submitLabel}
-      </button>
-    </div>
+    <>
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={pending}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700"
+        >
+          Batal
+        </button>
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+        >
+          {pending ? "Menyimpan..." : submitLabel}
+        </button>
+      </div>
+    </>
   );
 }

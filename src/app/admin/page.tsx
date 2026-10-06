@@ -10,6 +10,7 @@ import {
   schedules,
 } from "@/db/schema";
 import { getSession } from "@/lib/session";
+import { daysBetween } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard TU - CekJadwal BPN" };
@@ -18,7 +19,7 @@ export default async function AdminPage() {
   if (!(await getSession())) redirect("/admin/login");
 
   const [apps, activeSchedules, team, officerList] = await Promise.all([
-    db.select().from(applications).orderBy(asc(applications.file_number)),
+    db.select().from(applications).orderBy(asc(applications.ticket_number)),
     db.select().from(schedules).where(eq(schedules.status, "AKTIF")),
     db
       .select({
@@ -35,10 +36,17 @@ export default async function AdminPage() {
     const sch = activeSchedules.find((s) => s.application_id === a.id);
     return {
       id: a.id,
-      fileNumber: a.file_number,
+      ticketNumber: a.ticket_number,
       applicantName: a.applicant_name,
       address: a.object_address,
       status: a.status,
+      missingDocuments: a.missing_documents,
+      officialFileNumber: a.official_file_number,
+      daysInProcess: daysBetween(
+        a.created_at,
+        a.status === "SELESAI" ? new Date(a.status_updated_at) : new Date(),
+      ),
+      daysInStage: daysBetween(a.status_updated_at),
       inspectionDate: sch?.inspection_date ?? null,
       inspectionTime: sch?.inspection_time ?? null,
       notes: sch?.notes_for_public ?? null,

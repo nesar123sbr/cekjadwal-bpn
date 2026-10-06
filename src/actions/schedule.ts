@@ -49,7 +49,13 @@ export async function createSchedule(
     .where(eq(applications.id, applicationId))
     .get();
   if (!app) return { ok: false, error: "Berkas tidak ditemukan." };
-  if (app.status !== "BELUM_DIJADWALKAN") {
+  if (app.status === "MENUNGGU_DOKUMEN") {
+    return {
+      ok: false,
+      error: "Dokumen pemohon belum lengkap. Kosongkan catatan dokumen kurang terlebih dahulu.",
+    };
+  }
+  if (app.status !== "VERIFIKASI_PETUGAS") {
     return { ok: false, error: "Berkas ini sudah dijadwalkan atau selesai." };
   }
 
@@ -81,7 +87,10 @@ export async function createSchedule(
     );
     await tx
       .update(applications)
-      .set({ status: "DIJADWALKAN" })
+      .set({
+        status: "DIJADWALKAN",
+        status_updated_at: new Date().toISOString(),
+      })
       .where(eq(applications.id, applicationId));
   });
 
@@ -93,6 +102,7 @@ export type ScheduleActionResult = { ok: true } | { ok: false; error: string };
 
 export async function markApplicationComplete(
   applicationId: string,
+  officialFileNumber: string,
 ): Promise<ScheduleActionResult> {
   if (!(await getSession())) {
     return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
@@ -108,6 +118,20 @@ export async function markApplicationComplete(
     return { ok: false, error: "Hanya berkas terjadwal yang dapat diselesaikan." };
   }
 
+  const official = officialFileNumber.trim();
+  if (!official) {
+    return { ok: false, error: "Nomor Berkas Resmi BPN wajib diisi." };
+  }
+
+  const duplicate = await db
+    .select({ id: applications.id })
+    .from(applications)
+    .where(eq(applications.official_file_number, official))
+    .get();
+  if (duplicate && duplicate.id !== applicationId) {
+    return { ok: false, error: "Nomor Berkas Resmi sudah dipakai berkas lain." };
+  }
+
   await db.transaction(async (tx) => {
     await tx
       .update(schedules)
@@ -120,7 +144,11 @@ export async function markApplicationComplete(
       );
     await tx
       .update(applications)
-      .set({ status: "SELESAI" })
+      .set({
+        status: "SELESAI",
+        official_file_number: official,
+        status_updated_at: new Date().toISOString(),
+      })
       .where(eq(applications.id, applicationId));
   });
 

@@ -1,28 +1,36 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { searchFileNumber, type SearchResult } from "@/actions/search";
+import { searchTicket, type SearchResult } from "@/actions/search";
 
 type Props = {
   onResult: (result: SearchResult | null) => void;
 };
 
+const inputCls =
+  "w-full rounded-xl border border-gray-300 bg-white px-4 py-4 text-lg text-gray-900 shadow-sm outline-none placeholder:text-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200";
+
 export default function SearchForm({ onResult }: Props) {
-  const [value, setValue] = useState("");
+  const [ticket, setTicket] = useState("");
+  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!value.trim()) {
-      setError("Nomor berkas tidak boleh kosong.");
+    if (!ticket.trim() || !name.trim()) {
+      setError("Nomor tiket dan nama pemohon wajib diisi.");
+      return;
+    }
+    if (name.trim().length < 3) {
+      setError("Nama pemohon minimal 3 huruf.");
       return;
     }
     setError(null);
     setLoading(true);
     onResult(null);
     try {
-      onResult(await searchFileNumber(value));
+      onResult(await searchTicket({ ticketNumber: ticket, applicantName: name }));
     } catch {
       setError("Terjadi kesalahan. Silakan coba lagi.");
     } finally {
@@ -31,27 +39,46 @@ export default function SearchForm({ onResult }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full space-y-3" noValidate>
-      <label htmlFor="file-number" className="block text-sm font-medium text-gray-700">
-        Nomor Berkas
-      </label>
-      <input
-        id="file-number"
-        type="text"
-        inputMode="text"
-        autoComplete="off"
-        placeholder="Contoh: 1201/2026"
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-          if (error) setError(null);
-        }}
-        aria-invalid={!!error}
-        aria-describedby={error ? "file-number-error" : undefined}
-        className="w-full rounded-xl border border-gray-300 bg-white px-4 py-4 text-lg text-gray-900 shadow-sm outline-none placeholder:text-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200"
-      />
+    <form onSubmit={handleSubmit} className="w-full space-y-4" noValidate>
+      <div>
+        <label htmlFor="ticket" className="block text-sm font-medium text-gray-700">
+          Nomor Tiket / Registrasi
+        </label>
+        <input
+          id="ticket"
+          type="text"
+          autoComplete="off"
+          placeholder="Contoh: REG-1201/2026"
+          value={ticket}
+          onChange={(e) => {
+            setTicket(e.target.value);
+            if (error) setError(null);
+          }}
+          aria-invalid={!!error}
+          className={`mt-1 ${inputCls}`}
+        />
+      </div>
+      <div>
+        <label htmlFor="applicant" className="block text-sm font-medium text-gray-700">
+          Nama Pemohon
+        </label>
+        <input
+          id="applicant"
+          type="text"
+          autoComplete="off"
+          placeholder="Nama sesuai permohonan"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (error) setError(null);
+          }}
+          aria-invalid={!!error}
+          aria-describedby={error ? "search-error" : undefined}
+          className={`mt-1 ${inputCls}`}
+        />
+      </div>
       {error && (
-        <p id="file-number-error" role="alert" className="text-sm text-red-600">
+        <p id="search-error" role="alert" className="text-sm text-red-600">
           {error}
         </p>
       )}
@@ -60,7 +87,7 @@ export default function SearchForm({ onResult }: Props) {
         disabled={loading}
         className="w-full rounded-xl bg-blue-700 px-4 py-4 text-lg font-semibold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Mencari..." : "Cek Jadwal"}
+        {loading ? "Mencari..." : "Cek Status Berkas"}
       </button>
     </form>
   );
