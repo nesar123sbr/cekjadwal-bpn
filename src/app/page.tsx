@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { SearchResult } from "@/actions/search";
 import SearchForm from "@/components/public/SearchForm";
 import ScheduleResult from "@/components/public/ScheduleResult";
@@ -19,6 +20,11 @@ export default function Home() {
         </header>
         <SearchForm onResult={setResult} />
         {result && <ScheduleResult result={result} />}
+        <footer className="mt-8 text-center">
+          <Link href="/admin" className="text-xs text-gray-400 hover:text-gray-600">
+            Akses Internal Petugas TU
+          </Link>
+        </footer>
       </div>
     </main>
   );
