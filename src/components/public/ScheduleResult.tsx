@@ -33,6 +33,24 @@ export default function ScheduleResult({ result }: { result: SearchResult }) {
     );
   }
 
+  if (result.status === "SELESAI") {
+    return (
+      <section role="status" className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+        <h2 className="text-lg font-semibold text-emerald-800">
+          Pemeriksaan Lapangan Telah Selesai
+        </h2>
+        <p className="mt-1 text-sm text-emerald-700">
+          Berkas Anda sedang masuk tahap pengolahan data yuridis/teknis di kantor
+          pertanahan.
+        </p>
+        <dl className="mt-4 space-y-3">
+          <Row label="Nomor Berkas">{result.fileNumber}</Row>
+          <Row label="Pemohon">{result.applicantName}</Row>
+        </dl>
+      </section>
+    );
+  }
+
   if (result.status === "BELUM_DIJADWALKAN") {
     return (
       <section role="status" className="w-full rounded-2xl border border-amber-200 bg-amber-50 p-5">

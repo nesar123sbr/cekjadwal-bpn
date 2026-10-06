@@ -23,6 +23,7 @@ export default async function AdminPage() {
     db
       .select({
         scheduleId: schedule_officers.schedule_id,
+        officerId: officers.id,
         name: officers.name,
       })
       .from(schedule_officers)
@@ -40,6 +41,10 @@ export default async function AdminPage() {
       status: a.status,
       inspectionDate: sch?.inspection_date ?? null,
       inspectionTime: sch?.inspection_time ?? null,
+      notes: sch?.notes_for_public ?? null,
+      officerIds: sch
+        ? team.filter((t) => t.scheduleId === sch.id).map((t) => t.officerId)
+        : [],
       officerNames: sch
         ? team.filter((t) => t.scheduleId === sch.id).map((t) => t.name)
         : [],

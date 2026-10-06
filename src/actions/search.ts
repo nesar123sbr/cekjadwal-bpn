@@ -20,6 +20,12 @@ export type SearchResult =
       objectAddress: string;
     }
   | {
+      status: "SELESAI";
+      fileNumber: string;
+      applicantName: string;
+      objectAddress: string;
+    }
+  | {
       status: "DIJADWALKAN";
       fileNumber: string;
       applicantName: string;
@@ -49,6 +55,8 @@ export async function searchFileNumber(
     applicantName: maskName(app.applicant_name),
     objectAddress: maskAddress(app.object_address),
   };
+
+  if (app.status === "SELESAI") return { status: "SELESAI", ...base };
 
   const schedule = await db
     .select()
