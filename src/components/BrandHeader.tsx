@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function BrandHeader({
   children,
 }: {
@@ -6,12 +8,14 @@ export default function BrandHeader({
   return (
     <header className="bg-[#002B49] text-white">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4">
-        <div
-          aria-hidden
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-[#D4AF37] text-lg text-[#D4AF37]"
-        >
-          ★
-        </div>
+        <Image
+          src="/logo-bpn.svg"
+          alt="Logo Kementerian ATR/BPN"
+          width={44}
+          height={44}
+          priority
+          className="h-11 w-11 shrink-0 object-contain"
+        />
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase leading-tight tracking-wider text-[#D4AF37] sm:text-xs">
             Kementerian Agraria dan Tata Ruang /

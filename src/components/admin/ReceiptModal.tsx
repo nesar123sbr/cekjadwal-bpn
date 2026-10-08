@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import type { ReceiptData } from "@/actions/application";
@@ -57,6 +58,16 @@ export default function ReceiptModal({
       <div className="w-full max-w-lg rounded-t-2xl bg-white p-5 sm:rounded-2xl">
         <article id="receipt-sheet" className="space-y-4 text-gray-900">
           <header className="border-b-2 border-[#D4AF37] pb-3 text-center">
+            <div className="mb-2 flex justify-center">
+              <Image
+                src="/logo-bpn.svg"
+                alt="Logo Kementerian ATR/BPN"
+                width={48}
+                height={48}
+                priority
+                className="h-12 w-12 object-contain"
+              />
+            </div>
             <p className="text-[11px] font-semibold uppercase leading-tight tracking-wider text-[#002B49]">
               Kementerian Agraria dan Tata Ruang /
               <br />
