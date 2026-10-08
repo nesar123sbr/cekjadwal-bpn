@@ -24,3 +24,29 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media print {
+  @page {
+    size: A5;
+    margin: 12mm;
+  }
+  /* Sembunyikan seluruh halaman kecuali lembar tanda terima (dirender via portal di <body>). */
+  body > :not(.receipt-portal) {
+    display: none !important;
+  }
+  .receipt-portal {
+    position: static !important;
+    display: block !important;
+    background: #fff !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .receipt-portal > div {
+    max-width: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

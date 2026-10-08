@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
 import AdminTable, { type AdminRow } from "@/components/admin/AdminTable";
+import BrandHeader from "@/components/BrandHeader";
 import { db } from "@/db";
 import {
   applications,
@@ -37,6 +38,7 @@ export default async function AdminPage() {
     return {
       id: a.id,
       ticketNumber: a.ticket_number,
+      createdAt: a.created_at,
       applicantName: a.applicant_name,
       address: a.object_address,
       status: a.status,
@@ -60,21 +62,22 @@ export default async function AdminPage() {
   });
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
+    <div className="min-h-screen bg-slate-50">
+      <BrandHeader />
+      <div className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <h1 className="text-lg font-bold text-gray-900">Dashboard TU - CekJadwal BPN</h1>
+          <h1 className="text-lg font-bold text-[#002B49]">Dashboard TU - CekJadwal BPN</h1>
           <form action={logoutAction}>
             <button
               type="submit"
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+              className="rounded-lg border border-[#002B49] px-3 py-1.5 text-sm text-[#002B49] hover:bg-slate-100"
             >
               Keluar (Logout)
             </button>
           </form>
         </div>
-      </header>
-      <div className="mx-auto max-w-6xl px-4 py-6">
+      </div>
+      <main className="mx-auto max-w-6xl px-4 py-6">
         <AdminTable
           rows={rows}
           officers={officerList.map((o) => ({
@@ -83,7 +86,7 @@ export default async function AdminPage() {
             position: o.position,
           }))}
         />
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

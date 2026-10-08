@@ -14,13 +14,25 @@ export type CreateApplicationInput = {
   objectAddress: string;
 };
 
+export type ReceiptData = {
+  ticketNumber: string;
+  applicantName: string;
+  objectAddress: string;
+  /** ISO timestamp penerimaan berkas. */
+  receivedAt: string;
+};
+
 export type ApplicationActionResult =
   | { ok: true }
   | { ok: false; error: string };
 
+export type CreateApplicationResult =
+  | { ok: true; receipt: ReceiptData }
+  | { ok: false; error: string };
+
 export async function createApplication(
   input: CreateApplicationInput,
-): Promise<ApplicationActionResult> {
+): Promise<CreateApplicationResult> {
   if (!(await getSession())) {
     return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
   }
@@ -63,7 +75,15 @@ export async function createApplication(
   }
 
   revalidatePath("/admin");
-  return { ok: true };
+  return {
+    ok: true,
+    receipt: {
+      ticketNumber,
+      applicantName,
+      objectAddress,
+      receivedAt: now,
+    },
+  };
 }
 
 /**

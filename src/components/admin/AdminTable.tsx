@@ -1,17 +1,23 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { createApplication, updateMissingDocs } from "@/actions/application";
+import {
+  createApplication,
+  updateMissingDocs,
+  type ReceiptData,
+} from "@/actions/application";
 import {
   createSchedule,
   markApplicationComplete,
   updateSchedule,
 } from "@/actions/schedule";
 import type { ApplicationStatus } from "@/db/schema";
+import ReceiptModal from "./ReceiptModal";
 
 export type AdminRow = {
   id: string;
   ticketNumber: string;
+  createdAt: string;
   applicantName: string;
   address: string;
   status: ApplicationStatus;
@@ -51,6 +57,7 @@ type Dialog =
   | { kind: "docs"; row: AdminRow }
   | { kind: "complete"; row: AdminRow }
   | { kind: "new" }
+  | { kind: "receipt"; receipt: ReceiptData }
   | null;
 
 function Blocker({ row }: { row: AdminRow }) {
@@ -115,6 +122,19 @@ export default function AdminTable({
     setDialog({ kind: "complete", row });
   }
 
+  function openReceipt(row: AdminRow) {
+    setError(null);
+    setDialog({
+      kind: "receipt",
+      receipt: {
+        ticketNumber: row.ticketNumber,
+        applicantName: row.applicantName,
+        objectAddress: row.address,
+        receivedAt: row.createdAt,
+      },
+    });
+  }
+
   function openNew() {
     setTicketNumber("");
     setApplicantName("");
@@ -158,7 +178,15 @@ export default function AdminTable({
       return setError("Semua kolom wajib diisi.");
     }
     setError(null);
-    run(() => createApplication({ ticketNumber, applicantName, objectAddress }));
+    startTransition(async () => {
+      const res = await createApplication({ ticketNumber, applicantName, objectAddress });
+      if (res.ok) {
+        setError(null);
+        setDialog({ kind: "receipt", receipt: res.receipt });
+      } else {
+        setError(res.error);
+      }
+    });
   }
 
   function submitDocs(e: FormEvent<HTMLFormElement>) {
@@ -282,7 +310,12 @@ export default function AdminTable({
                         </button>
                       </>
                     )}
-                    {r.status === "SELESAI" && <span className="text-gray-400">-</span>}
+                    <button
+                      onClick={() => openReceipt(r)}
+                      className={`${btn} border border-[#002B49] bg-white text-[#002B49] hover:bg-slate-100`}
+                    >
+                      Cetak Tiket
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -445,6 +478,10 @@ export default function AdminTable({
             />
           </form>
         </Modal>
+      )}
+
+      {dialog?.kind === "receipt" && (
+        <ReceiptModal receipt={dialog.receipt} onClose={close} />
       )}
 
       {dialog?.kind === "complete" && (
