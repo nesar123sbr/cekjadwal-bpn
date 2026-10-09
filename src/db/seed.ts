@@ -1,5 +1,6 @@
 import { db } from "./index";
 import {
+  application_visits,
   applications,
   officers,
   schedule_officers,
@@ -25,6 +26,7 @@ type SeedApp = {
 
 async function seed() {
   // Reset (urutan child -> parent) agar seed idempotent.
+  await db.delete(application_visits);
   await db.delete(schedule_officers);
   await db.delete(schedules);
   await db.delete(applications);
@@ -47,6 +49,16 @@ async function seed() {
         "FC KTP batas tanah sebelah utara\nSurat sporadik belum ttd kades",
       created_at: daysAgo(9),
       status_updated_at: daysAgo(6),
+    },
+    {
+      // Skenario 1b: nomor tiket sama beda bidang tanah (mendukung tiket non-unique & multiple parcels)
+      id: "app-1201-b",
+      ticket_number: "REG-1201/2026",
+      applicant_name: "Ahmad Syahputra",
+      object_address: "Jl. Dago Barat No. 45, Kel. Dago, Kec. Coblong",
+      status: "VERIFIKASI_PETUGAS",
+      created_at: daysAgo(5),
+      status_updated_at: daysAgo(5),
     },
     {
       // Skenario 2: sudah terjadwal
@@ -77,8 +89,73 @@ async function seed() {
       ticket_number_normalized: normalizeTicketNumber(a.ticket_number),
       missing_documents: a.missing_documents ?? null,
       official_file_number: a.official_file_number ?? null,
+      deleted_at: null,
     })),
   );
+
+  // Insert riwayat kedatangan pemohon (application_visits)
+  await db.insert(application_visits).values([
+    // app-1201
+    {
+      id: "vis-1201-1",
+      application_id: "app-1201",
+      visit_date: daysAgo(9).slice(0, 10),
+      notes: "Pendaftaran Berkas Awal di loket pelayanan",
+      created_at: daysAgo(9),
+    },
+    {
+      id: "vis-1201-2",
+      application_id: "app-1201",
+      visit_date: daysAgo(6).slice(0, 10),
+      notes: "Konsultasi kelengkapan berkas yang kurang",
+      created_at: daysAgo(6),
+    },
+    // app-1201-b
+    {
+      id: "vis-1201b-1",
+      application_id: "app-1201-b",
+      visit_date: daysAgo(5).slice(0, 10),
+      notes: "Pendaftaran Berkas Awal (Bidang ke-2)",
+      created_at: daysAgo(5),
+    },
+    // app-1202
+    {
+      id: "vis-1202-1",
+      application_id: "app-1202",
+      visit_date: daysAgo(12).slice(0, 10),
+      notes: "Pendaftaran Berkas Awal",
+      created_at: daysAgo(12),
+    },
+    {
+      id: "vis-1202-2",
+      application_id: "app-1202",
+      visit_date: daysAgo(2).slice(0, 10),
+      notes: "Konfirmasi persiapan patok batas bidang tanah",
+      created_at: daysAgo(2),
+    },
+    // app-1203
+    {
+      id: "vis-1203-1",
+      application_id: "app-1203",
+      visit_date: daysAgo(20).slice(0, 10),
+      notes: "Pendaftaran Berkas Awal",
+      created_at: daysAgo(20),
+    },
+    {
+      id: "vis-1203-2",
+      application_id: "app-1203",
+      visit_date: daysAgo(10).slice(0, 10),
+      notes: "Penyerahan kelengkapan berkas fisik",
+      created_at: daysAgo(10),
+    },
+    {
+      id: "vis-1203-3",
+      application_id: "app-1203",
+      visit_date: daysAgo(3).slice(0, 10),
+      notes: "Pengecekan akhir hasil ukur lapangan",
+      created_at: daysAgo(3),
+    },
+  ]);
 
   await db.insert(schedules).values([
     {

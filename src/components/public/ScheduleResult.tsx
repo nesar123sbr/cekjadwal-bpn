@@ -1,10 +1,20 @@
-import type { SearchResult } from "@/actions/search";
+import type { SearchResult, SearchResultItem } from "@/actions/search";
 
 function formatDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("id-ID", {
     weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatShortDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("id-ID", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -28,30 +38,19 @@ function Duration({ days, label }: { days: number; label: string }) {
   );
 }
 
-type Props = { result: SearchResult };
-
-export default function ScheduleResult({ result }: Props) {
-  if (result.status === "TIDAK_DITEMUKAN") {
-    return (
-      <section role="status" className="w-full rounded-2xl border border-gray-300 bg-gray-100 p-5">
-        <h2 className="text-lg font-semibold text-gray-800">Data tidak ditemukan</h2>
-        <p className="mt-1 text-sm text-gray-700">
-          Nomor tiket dan nama pemohon tidak cocok dengan data kami. Periksa
-          kembali penulisannya, atau hubungi loket pelayanan.
-        </p>
-      </section>
-    );
-  }
-
+function ResultCard({ item }: { item: SearchResultItem }) {
   const header = (
     <dl className="mt-4 space-y-3">
-      <Row label="Nomor Tiket">{result.ticketNumber}</Row>
-      <Row label="Pemohon">{result.applicantName}</Row>
-      <Row label="Lokasi">{result.objectAddress}</Row>
+      <Row label="Nomor Tiket">{item.ticketNumber}</Row>
+      <Row label="Pemohon">{item.applicantName}</Row>
+      <Row label="Lokasi">{item.objectAddress}</Row>
+      <Row label="Kunjungan Terakhir">
+        {item.lastVisitDate ? formatShortDate(item.lastVisitDate) : "-"}
+      </Row>
     </dl>
   );
 
-  if (result.status === "DOKUMEN_KURANG") {
+  if (item.status === "DOKUMEN_KURANG") {
     return (
       <section role="status" className="w-full rounded-2xl border border-red-200 bg-red-50 p-5">
         <h2 className="text-lg font-semibold text-red-800">Dokumen Belum Lengkap</h2>
@@ -62,9 +61,9 @@ export default function ScheduleResult({ result }: Props) {
         {header}
         <div className="mt-4 rounded-xl border border-red-300 bg-white p-4 text-sm text-red-900">
           <p className="font-semibold">Dokumen yang perlu dilengkapi:</p>
-          {result.missingDocuments.length > 0 ? (
+          {item.missingDocuments.length > 0 ? (
             <ul className="mt-1 list-disc space-y-1 pl-5">
-              {result.missingDocuments.map((d) => (
+              {item.missingDocuments.map((d) => (
                 <li key={d}>{d}</li>
               ))}
             </ul>
@@ -73,14 +72,14 @@ export default function ScheduleResult({ result }: Props) {
           )}
         </div>
         <Duration
-          days={result.daysInProcess}
-          label={`Saat ini menunggu kelengkapan dokumen dari pemohon selama ${result.daysWaiting} hari.`}
+          days={item.daysInProcess}
+          label={`Saat ini menunggu kelengkapan dokumen dari pemohon selama ${item.daysWaiting} hari.`}
         />
       </section>
     );
   }
 
-  if (result.status === "MENUNGGU_JADWAL") {
+  if (item.status === "MENUNGGU_JADWAL") {
     return (
       <section role="status" className="w-full rounded-2xl border border-amber-200 bg-amber-50 p-5">
         <h2 className="text-lg font-semibold text-amber-800">Menunggu Jadwal Pemeriksaan</h2>
@@ -90,26 +89,29 @@ export default function ScheduleResult({ result }: Props) {
         </p>
         {header}
         <Duration
-          days={result.daysInProcess}
-          label={`Saat ini menunggu jadwal dari petugas selama ${result.daysWaiting} hari.`}
+          days={item.daysInProcess}
+          label={`Saat ini menunggu jadwal dari petugas selama ${item.daysWaiting} hari.`}
         />
       </section>
     );
   }
 
-  if (result.status === "DIJADWALKAN") {
+  if (item.status === "DIJADWALKAN") {
     return (
       <section role="status" className="w-full rounded-2xl border border-green-200 bg-green-50 p-5">
         <h2 className="text-lg font-semibold text-green-800">Jadwal pemeriksaan ditetapkan</h2>
         <dl className="mt-4 space-y-3">
-          <Row label="Nomor Tiket">{result.ticketNumber}</Row>
-          <Row label="Pemohon">{result.applicantName}</Row>
-          <Row label="Tanggal">{formatDate(result.inspectionDate)}</Row>
-          <Row label="Jam">{result.inspectionTime} WIB</Row>
-          <Row label="Lokasi">{result.objectAddress}</Row>
+          <Row label="Nomor Tiket">{item.ticketNumber}</Row>
+          <Row label="Pemohon">{item.applicantName}</Row>
+          <Row label="Tanggal">{formatDate(item.inspectionDate)}</Row>
+          <Row label="Jam">{item.inspectionTime} WIB</Row>
+          <Row label="Lokasi">{item.objectAddress}</Row>
+          <Row label="Kunjungan Terakhir">
+            {item.lastVisitDate ? formatShortDate(item.lastVisitDate) : "-"}
+          </Row>
           <Row label="Petugas">
             <ul className="space-y-1">
-              {result.officers.map((o) => (
+              {item.officers.map((o) => (
                 <li key={`${o.name}-${o.position}`}>
                   {o.name}
                   <span className="block text-sm font-normal text-gray-600">
@@ -127,9 +129,9 @@ export default function ScheduleResult({ result }: Props) {
             Pastikan patok tanda batas tanah sudah terpasang sebelum petugas
             tiba, dan pemohon atau kuasa hadir di lokasi.
           </p>
-          {result.notes && <p className="mt-2 italic">Catatan: {result.notes}</p>}
+          {item.notes && <p className="mt-2 italic">Catatan: {item.notes}</p>}
         </div>
-        <Duration days={result.daysInProcess} label="" />
+        <Duration days={item.daysInProcess} label="" />
       </section>
     );
   }
@@ -147,13 +149,42 @@ export default function ScheduleResult({ result }: Props) {
         <p className="mt-2 text-xs uppercase tracking-wide text-blue-700">
           Nomor Berkas Resmi
         </p>
-        <p className="text-2xl font-bold">{result.officialFileNumber}</p>
+        <p className="text-2xl font-bold">{item.officialFileNumber}</p>
         <p className="mt-2 text-sm">
           Silakan pantau kelanjutan berkas Anda di aplikasi Sentuh Tanahku
           menggunakan nomor berkas di atas.
         </p>
       </div>
-      <Duration days={result.daysInProcess} label="" />
+      <Duration days={item.daysInProcess} label="" />
     </section>
+  );
+}
+
+type Props = { result: SearchResult };
+
+export default function ScheduleResult({ result }: Props) {
+  if (result.status === "TIDAK_DITEMUKAN" || result.items.length === 0) {
+    return (
+      <section role="status" className="w-full rounded-2xl border border-gray-300 bg-gray-100 p-5">
+        <h2 className="text-lg font-semibold text-gray-800">Data tidak ditemukan</h2>
+        <p className="mt-1 text-sm text-gray-700">
+          Nomor tiket dan nama pemohon tidak cocok dengan data kami. Periksa
+          kembali penulisannya, atau hubungi loket pelayanan.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <div className="w-full space-y-4">
+      {result.items.length > 1 && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-center text-sm font-medium text-blue-900">
+          Ditemukan {result.items.length} bidang tanah terdaftar untuk tiket dan nama ini:
+        </div>
+      )}
+      {result.items.map((item) => (
+        <ResultCard key={item.id} item={item} />
+      ))}
+    </div>
   );
 }

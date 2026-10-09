@@ -14,7 +14,7 @@ const nowIso = () => new Date().toISOString();
 export const applications = sqliteTable("applications", {
   id: text("id").primaryKey(),
   ticket_number: text("ticket_number").notNull(),
-  ticket_number_normalized: text("ticket_number_normalized").notNull().unique(),
+  ticket_number_normalized: text("ticket_number_normalized").notNull(),
   applicant_name: text("applicant_name").notNull(),
   object_address: text("object_address").notNull(),
   status: text("status", { enum: APPLICATION_STATUSES })
@@ -26,6 +26,18 @@ export const applications = sqliteTable("applications", {
   created_at: text("created_at").notNull().$defaultFn(nowIso),
   /** ISO timestamp terakhir status berubah; dasar lama di tahap saat ini. */
   status_updated_at: text("status_updated_at").notNull().$defaultFn(nowIso),
+  /** ISO timestamp soft-delete (null jika berkas aktif). */
+  deleted_at: text("deleted_at"),
+});
+
+export const application_visits = sqliteTable("application_visits", {
+  id: text("id").primaryKey(),
+  application_id: text("application_id")
+    .notNull()
+    .references(() => applications.id),
+  visit_date: text("visit_date").notNull(),
+  notes: text("notes"),
+  created_at: text("created_at").notNull().$defaultFn(nowIso),
 });
 
 export const officers = sqliteTable("officers", {

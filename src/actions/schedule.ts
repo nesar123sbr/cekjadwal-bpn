@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -46,7 +46,7 @@ export async function createSchedule(
   const app = await db
     .select()
     .from(applications)
-    .where(eq(applications.id, applicationId))
+    .where(and(eq(applications.id, applicationId), isNull(applications.deleted_at)))
     .get();
   if (!app) return { ok: false, error: "Berkas tidak ditemukan." };
   if (app.status === "MENUNGGU_DOKUMEN") {
@@ -111,7 +111,7 @@ export async function markApplicationComplete(
   const app = await db
     .select()
     .from(applications)
-    .where(eq(applications.id, applicationId))
+    .where(and(eq(applications.id, applicationId), isNull(applications.deleted_at)))
     .get();
   if (!app) return { ok: false, error: "Berkas tidak ditemukan." };
   if (app.status !== "DIJADWALKAN") {

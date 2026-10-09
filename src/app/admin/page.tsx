@@ -1,10 +1,11 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
 import AdminTable, { type AdminRow } from "@/components/admin/AdminTable";
 import BrandHeader from "@/components/BrandHeader";
 import { db } from "@/db";
 import {
+  application_visits,
   applications,
   officers,
   schedule_officers,
@@ -19,8 +20,12 @@ export const metadata = { title: "Dashboard TU - CekJadwal BPN" };
 export default async function AdminPage() {
   if (!(await getSession())) redirect("/admin/login");
 
-  const [apps, activeSchedules, team, officerList] = await Promise.all([
-    db.select().from(applications).orderBy(asc(applications.ticket_number)),
+  const [apps, activeSchedules, team, officerList, allVisits] = await Promise.all([
+    db
+      .select()
+      .from(applications)
+      .where(isNull(applications.deleted_at))
+      .orderBy(desc(applications.created_at)),
     db.select().from(schedules).where(eq(schedules.status, "AKTIF")),
     db
       .select({
@@ -31,13 +36,21 @@ export default async function AdminPage() {
       .from(schedule_officers)
       .innerJoin(officers, eq(schedule_officers.officer_id, officers.id)),
     db.select().from(officers).orderBy(asc(officers.name)),
+    db
+      .select()
+      .from(application_visits)
+      .orderBy(asc(application_visits.visit_date), asc(application_visits.created_at)),
   ]);
 
   const rows: AdminRow[] = apps.map((a) => {
     const sch = activeSchedules.find((s) => s.application_id === a.id);
+    const appVisits = allVisits.filter((v) => v.application_id === a.id);
+    const firstVisitDate = appVisits[0]?.visit_date ?? a.created_at.slice(0, 10);
+
     return {
       id: a.id,
       ticketNumber: a.ticket_number,
+      firstVisitDate,
       createdAt: a.created_at,
       applicantName: a.applicant_name,
       address: a.object_address,
@@ -65,7 +78,7 @@ export default async function AdminPage() {
     <div className="min-h-screen bg-slate-50">
       <BrandHeader />
       <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <h1 className="text-lg font-bold text-[#002B49]">Dashboard TU - CekJadwal BPN</h1>
           <form action={logoutAction}>
             <button
@@ -77,7 +90,7 @@ export default async function AdminPage() {
           </form>
         </div>
       </div>
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-6">
         <AdminTable
           rows={rows}
           officers={officerList.map((o) => ({
