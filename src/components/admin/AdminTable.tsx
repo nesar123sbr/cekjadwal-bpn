@@ -65,7 +65,43 @@ const DEFAULT_NOTES = "Harap patok batas terpasang";
 const inputCls =
   "mt-1 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-2 focus:ring-[#002B49]/20 outline-none transition";
 
-type StatusTab = "SEMUA" | ApplicationStatus;
+type StatusTab = "SEMUA" | ApplicationStatus | "OVERDUE" | "TODAY";
+
+type ScheduleUrgency = "OVERDUE" | "TODAY" | "UPCOMING" | "NONE";
+
+function checkScheduleUrgency(
+  dateStr: string | null,
+  timeStr: string | null,
+): ScheduleUrgency {
+  if (!dateStr) return "NONE";
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  // Cek apakah tanggal sudah lewat hari
+  if (dateStr < todayStr) return "OVERDUE";
+
+  // Cek jika tanggal hari ini
+  if (dateStr === todayStr) {
+    if (!timeStr) return "TODAY";
+    const [hour, minute] = timeStr.split(":").map(Number);
+    if (!Number.isNaN(hour) && !Number.isNaN(minute)) {
+      const schedDate = new Date();
+      schedDate.setHours(hour, minute, 0, 0);
+      // Jika jam sudah lewat hari ini
+      if (schedDate < now) return "OVERDUE";
+    }
+    return "TODAY";
+  }
+
+  return "UPCOMING";
+}
+
+function formatShortDate(dateStr: string): string {
+  if (!dateStr) return "-";
+  const d = new Date(dateStr.includes("T") ? dateStr : `${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+}
 
 type Dialog =
   | { kind: "schedule"; row: AdminRow; edit: boolean }
@@ -536,11 +572,42 @@ export default function AdminTable({
     selectedDistrict !== "SEMUA" ||
     selectedTab !== "SEMUA";
 
+  // List berkas overdue & hari ini untuk peringatan jadwal otomatis
+  const { overdueList, todayList } = useMemo(() => {
+    const overdue: AdminRow[] = [];
+    const today: AdminRow[] = [];
+    for (const r of rows) {
+      if (r.status === "DIJADWALKAN") {
+        const urgency = checkScheduleUrgency(
+          r.inspectionDate,
+          r.inspectionTime,
+        );
+        if (urgency === "OVERDUE") overdue.push(r);
+        else if (urgency === "TODAY") today.push(r);
+      }
+    }
+    return { overdueList: overdue, todayList: today };
+  }, [rows]);
+
   // Filtered rows dengan kombinasi Status, Kecamatan, Rentang Tanggal, & Search Query
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
       // 1. Filter Status Tab
-      if (selectedTab !== "SEMUA" && r.status !== selectedTab) {
+      if (selectedTab === "OVERDUE") {
+        if (
+          r.status !== "DIJADWALKAN" ||
+          checkScheduleUrgency(r.inspectionDate, r.inspectionTime) !== "OVERDUE"
+        ) {
+          return false;
+        }
+      } else if (selectedTab === "TODAY") {
+        if (
+          r.status !== "DIJADWALKAN" ||
+          checkScheduleUrgency(r.inspectionDate, r.inspectionTime) !== "TODAY"
+        ) {
+          return false;
+        }
+      } else if (selectedTab !== "SEMUA" && r.status !== selectedTab) {
         return false;
       }
 
@@ -710,6 +777,75 @@ export default function AdminTable({
           </button>
         </div>
       </div>
+
+      {/* Operational Reminder Summary Banners */}
+      {(overdueList.length > 0 || todayList.length > 0) && (
+        <div className="mb-4 space-y-2.5">
+          {overdueList.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50/90 p-3.5 sm:p-4 text-rose-900 shadow-xs">
+              <div className="flex items-start sm:items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white text-base shadow-xs">
+                  ⚠️
+                </span>
+                <div>
+                  <h4 className="text-sm font-bold text-rose-950">
+                    Perhatian: {overdueList.length} Jadwal Pemeriksaan Terlewat / Belum Selesai!
+                  </h4>
+                  <p className="text-xs text-rose-800 font-medium">
+                    Terdapat jadwal yang telah melewati batas waktu tetapi status berkas belum ditandai Selesai.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTab("OVERDUE")}
+                className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5 ${
+                  selectedTab === "OVERDUE"
+                    ? "bg-rose-800 text-white ring-2 ring-rose-400"
+                    : "bg-rose-600 hover:bg-rose-700 text-white"
+                }`}
+              >
+                <span>Lihat Berkas Terlewat</span>
+                <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                  {overdueList.length}
+                </span>
+              </button>
+            </div>
+          )}
+
+          {todayList.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 p-3.5 sm:p-4 text-amber-950 shadow-xs">
+              <div className="flex items-start sm:items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white text-base shadow-xs">
+                  ⏰
+                </span>
+                <div>
+                  <h4 className="text-sm font-bold text-amber-950">
+                    Agenda Hari Ini: {todayList.length} Jadwal Pemeriksaan Berlangsung Hari Ini
+                  </h4>
+                  <p className="text-xs text-amber-800 font-medium">
+                    Pastikan petugas lapangan telah menerima konfirmasi dan siap menuju lokasi.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTab("TODAY")}
+                className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5 ${
+                  selectedTab === "TODAY"
+                    ? "bg-amber-800 text-white ring-2 ring-amber-400"
+                    : "bg-amber-600 hover:bg-amber-700 text-white"
+                }`}
+              >
+                <span>Lihat Jadwal Hari Ini</span>
+                <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                  {todayList.length}
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Toolbar: Multi-Dimensional Filter (Search, Date Range, District, Status) */}
       <div className="mb-4 space-y-3 rounded-2xl border border-gray-200/90 bg-white/95 backdrop-blur-xs p-3.5 sm:p-4 shadow-xs">
@@ -936,6 +1072,54 @@ export default function AdminTable({
               {countDone}
             </span>
           </button>
+
+          {/* Quick Filter: Overdue Alert Chip */}
+          {overdueList.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedTab("OVERDUE")}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition border ${
+                selectedTab === "OVERDUE"
+                  ? "bg-rose-700 text-white border-rose-800 shadow-xs"
+                  : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+              }`}
+            >
+              <span>⚠️ Terlewat</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                  selectedTab === "OVERDUE"
+                    ? "bg-white/20 text-white"
+                    : "bg-rose-200 text-rose-800"
+                }`}
+              >
+                {overdueList.length}
+              </span>
+            </button>
+          )}
+
+          {/* Quick Filter: Today Alert Chip */}
+          {todayList.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedTab("TODAY")}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition border ${
+                selectedTab === "TODAY"
+                  ? "bg-amber-600 text-white border-amber-700 shadow-xs"
+                  : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+              }`}
+            >
+              <span>⏰ Hari Ini</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                  selectedTab === "TODAY"
+                    ? "bg-white/20 text-white"
+                    : "bg-amber-200 text-amber-900"
+                }`}
+              >
+                {todayList.length}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1033,12 +1217,66 @@ export default function AdminTable({
                 <td className="px-4 py-3.5 whitespace-nowrap">
                   {r.inspectionDate ? (
                     <div>
-                      <div className="font-medium text-gray-900 text-xs">
-                        {formatIndoDate(r.inspectionDate)}
-                      </div>
-                      <div className="text-[11px] text-gray-500">
-                        {r.inspectionTime ? `${r.inspectionTime} WIB` : ""}
-                      </div>
+                      {r.status === "DIJADWALKAN" ? (
+                        (() => {
+                          const urgency = checkScheduleUrgency(
+                            r.inspectionDate,
+                            r.inspectionTime,
+                          );
+                          if (urgency === "OVERDUE") {
+                            return (
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="bg-rose-100 text-rose-800 border border-rose-300 font-semibold px-2.5 py-1 rounded-lg inline-flex items-center gap-1 text-xs">
+                                  <span>⚠️</span>
+                                  <span>
+                                    Terlewat ({formatShortDate(r.inspectionDate)}
+                                    {r.inspectionTime ? ` ${r.inspectionTime} WIB` : ""})
+                                  </span>
+                                </span>
+                                <span className="text-[11px] text-rose-600 font-medium">
+                                  Konfirmasi hasil pemeriksaan
+                                </span>
+                              </div>
+                            );
+                          }
+                          if (urgency === "TODAY") {
+                            return (
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="bg-amber-100 text-amber-900 border border-amber-300 font-bold px-2.5 py-1 rounded-lg inline-flex items-center gap-1 animate-pulse text-xs">
+                                  <span>⏰</span>
+                                  <span>
+                                    HARI INI (
+                                    {r.inspectionTime ? `${r.inspectionTime} WIB` : ""}
+                                    )
+                                  </span>
+                                </span>
+                                <span className="text-[11px] text-amber-700 font-medium">
+                                  Ingatkan petugas lapangan
+                                </span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div>
+                              <div className="font-medium text-gray-900 text-xs">
+                                {formatIndoDate(r.inspectionDate)}
+                              </div>
+                              <div className="text-[11px] text-gray-500">
+                                {r.inspectionTime ? `${r.inspectionTime} WIB` : ""}
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div>
+                          <div className="font-medium text-gray-900 text-xs">
+                            {formatIndoDate(r.inspectionDate)}
+                          </div>
+                          <div className="text-[11px] text-gray-500">
+                            {r.inspectionTime ? `${r.inspectionTime} WIB` : ""}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <span className="text-gray-400 text-xs">-</span>
