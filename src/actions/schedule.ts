@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -65,6 +65,30 @@ export async function createSchedule(
     .where(inArray(officers.id, officerIds));
   if (found.length !== officerIds.length) {
     return { ok: false, error: "Petugas tidak valid." };
+  }
+
+  const conflict = await db
+    .select({
+      officerName: officers.name,
+    })
+    .from(schedule_officers)
+    .innerJoin(schedules, eq(schedule_officers.schedule_id, schedules.id))
+    .innerJoin(officers, eq(schedule_officers.officer_id, officers.id))
+    .where(
+      and(
+        inArray(schedule_officers.officer_id, officerIds),
+        eq(schedules.inspection_date, inspectionDate),
+        eq(schedules.inspection_time, inspectionTime),
+        eq(schedules.status, "AKTIF"),
+      ),
+    )
+    .get();
+
+  if (conflict) {
+    return {
+      ok: false,
+      error: `Jadwal bentrok: Petugas ${conflict.officerName} sudah memiliki jadwal pemeriksaan lain pada tanggal dan jam tersebut.`,
+    };
   }
 
   const scheduleId = randomUUID();
@@ -196,6 +220,31 @@ export async function updateSchedule(
     .where(inArray(officers.id, officerIds));
   if (found.length !== officerIds.length) {
     return { ok: false, error: "Petugas tidak valid." };
+  }
+
+  const conflict = await db
+    .select({
+      officerName: officers.name,
+    })
+    .from(schedule_officers)
+    .innerJoin(schedules, eq(schedule_officers.schedule_id, schedules.id))
+    .innerJoin(officers, eq(schedule_officers.officer_id, officers.id))
+    .where(
+      and(
+        inArray(schedule_officers.officer_id, officerIds),
+        eq(schedules.inspection_date, inspectionDate),
+        eq(schedules.inspection_time, inspectionTime),
+        eq(schedules.status, "AKTIF"),
+        ne(schedules.id, schedule.id),
+      ),
+    )
+    .get();
+
+  if (conflict) {
+    return {
+      ok: false,
+      error: `Jadwal bentrok: Petugas ${conflict.officerName} sudah memiliki jadwal pemeriksaan lain pada tanggal dan jam tersebut.`,
+    };
   }
 
   await db.transaction(async (tx) => {

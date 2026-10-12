@@ -5,8 +5,6 @@ import { db } from "@/db";
 import {
   application_visits,
   applications,
-  officers,
-  schedule_officers,
   schedules,
 } from "@/db/schema";
 import { daysBetween, normalizeTicketNumber } from "@/lib/utils";
@@ -115,21 +113,6 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
       ),
     );
 
-  const scheduleIds = activeSchedules.map((s) => s.id);
-  const officersBySchedule =
-    scheduleIds.length > 0
-      ? await db
-          .select({
-            scheduleId: schedule_officers.schedule_id,
-            name: officers.name,
-            position: officers.position,
-            role: schedule_officers.role_in_team,
-          })
-          .from(schedule_officers)
-          .innerJoin(officers, eq(schedule_officers.officer_id, officers.id))
-          .where(inArray(schedule_officers.schedule_id, scheduleIds))
-      : [];
-
   const items: SearchResultItem[] = validApps.map((app) => {
     const stageEnd =
       app.status === "SELESAI" ? new Date(app.status_updated_at) : new Date();
@@ -176,21 +159,13 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
       };
     }
 
-    const team = officersBySchedule
-      .filter((o) => o.scheduleId === schedule.id)
-      .map((o) => ({
-        name: o.name,
-        position: o.position,
-        role: o.role,
-      }));
-
     return {
       ...base,
       status: "DIJADWALKAN",
       inspectionDate: schedule.inspection_date,
       inspectionTime: schedule.inspection_time,
       notes: schedule.notes_for_public,
-      officers: team,
+      officers: [],
     };
   });
 

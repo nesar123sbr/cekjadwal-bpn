@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { application_visits, applications } from "@/db/schema";
+import { application_visits, applications, schedules } from "@/db/schema";
 import { getSession } from "@/lib/session";
 import { normalizeTicketNumber } from "@/lib/utils";
 
@@ -154,12 +154,22 @@ export async function deleteApplication(
     .get();
   if (!app) return { ok: false, error: "Berkas tidak ditemukan." };
 
-  await db
-    .update(applications)
-    .set({
-      deleted_at: new Date().toISOString(),
-    })
-    .where(eq(applications.id, id));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(schedules)
+      .set({ status: "DIBATALKAN" })
+      .where(
+        and(
+          eq(schedules.application_id, id),
+          eq(schedules.status, "AKTIF"),
+        ),
+      );
+
+    await tx
+      .update(applications)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(applications.id, id));
+  });
 
   revalidatePath("/admin");
   return { ok: true };

@@ -1,10 +1,10 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { officers, schedule_officers, schedules } from "@/db/schema";
+import { applications, officers, schedule_officers, schedules } from "@/db/schema";
 import { getSession } from "@/lib/session";
 
 export type OfficerItem = {
@@ -66,10 +66,12 @@ export async function deleteOfficer(
     .select({ id: schedule_officers.id })
     .from(schedule_officers)
     .innerJoin(schedules, eq(schedule_officers.schedule_id, schedules.id))
+    .innerJoin(applications, eq(schedules.application_id, applications.id))
     .where(
       and(
         eq(schedule_officers.officer_id, id),
         eq(schedules.status, "AKTIF"),
+        isNull(applications.deleted_at),
       ),
     )
     .get();
