@@ -78,7 +78,7 @@ export default async function AdminPage() {
     <div className="min-h-screen bg-slate-50">
       <BrandHeader />
       <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-[1520px] items-center justify-between px-4 sm:px-6 py-3">
           <h1 className="text-lg font-bold text-[#002B49]">Dashboard TU - CekJadwal BPN</h1>
           <form action={logoutAction}>
             <button
@@ -90,7 +90,7 @@ export default async function AdminPage() {
           </form>
         </div>
       </div>
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main className="mx-auto w-full max-w-[1520px] px-4 sm:px-6 py-6">
         <AdminTable
           rows={rows}
           officers={officerList.map((o) => ({
