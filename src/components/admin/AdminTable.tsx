@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import {
   addVisitLog,
   createApplication,
@@ -102,6 +102,11 @@ function escapeCsv(val: string | number | null | undefined): string {
   return `"${str}"`;
 }
 
+function extractDistrict(address: string): string | null {
+  const match = address.match(/Kec\.?\s+([^,]+)/i);
+  return match ? match[1].trim() : null;
+}
+
 export default function AdminTable({
   rows,
   officers,
@@ -116,6 +121,9 @@ export default function AdminTable({
   // Toolbar filters
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState<StatusTab>("SEMUA");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("SEMUA");
 
   // State menu aksi dropdown
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
@@ -140,6 +148,16 @@ export default function AdminTable({
   const [loadingVisits, setLoadingVisits] = useState(false);
   const [visitDateInput, setVisitDateInput] = useState("");
   const [visitNotesInput, setVisitNotesInput] = useState("");
+
+  // Ekstrak daftar unik kecamatan dari data alamat
+  const availableDistricts = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((r) => {
+      const d = extractDistrict(r.address);
+      if (d) set.add(d);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "id"));
+  }, [rows]);
 
   // Tutup dropdown saat klik di luar atau tekan tombol Escape
   useEffect(() => {
@@ -346,11 +364,47 @@ export default function AdminTable({
     }
   }
 
-  // Filtered rows
+  function handleResetFilters() {
+    setSearchQuery("");
+    setStartDate("");
+    setEndDate("");
+    setSelectedDistrict("SEMUA");
+    setSelectedTab("SEMUA");
+  }
+
+  const hasActiveFilter =
+    searchQuery.trim() !== "" ||
+    startDate !== "" ||
+    endDate !== "" ||
+    selectedDistrict !== "SEMUA" ||
+    selectedTab !== "SEMUA";
+
+  // Filtered rows dengan kombinasi Status, Kecamatan, Rentang Tanggal, & Search Query
   const filteredRows = rows.filter((r) => {
+    // 1. Filter Status Tab
     if (selectedTab !== "SEMUA" && r.status !== selectedTab) {
       return false;
     }
+
+    // 2. Filter Kecamatan
+    if (selectedDistrict !== "SEMUA") {
+      const dist = extractDistrict(r.address);
+      const matchDistrict =
+        (dist && dist.toLowerCase() === selectedDistrict.toLowerCase()) ||
+        r.address.toLowerCase().includes(selectedDistrict.toLowerCase());
+      if (!matchDistrict) return false;
+    }
+
+    // 3. Filter Rentang Tanggal (berdasarkan tanggal masuk/kunjungan awal)
+    const entryDate = r.firstVisitDate || r.createdAt.slice(0, 10);
+    if (startDate && entryDate < startDate) {
+      return false;
+    }
+    if (endDate && entryDate > endDate) {
+      return false;
+    }
+
+    // 4. Filter Kata Kunci Pencarian
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       const matchTicket = r.ticketNumber.toLowerCase().includes(q);
@@ -421,7 +475,7 @@ export default function AdminTable({
 
   return (
     <>
-      {/* Top action row */}
+      {/* Top Action Row */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-[#002B49]">
@@ -462,10 +516,10 @@ export default function AdminTable({
         </div>
       </div>
 
-      {/* Toolbar: Search & Status Filters */}
+      {/* Toolbar: Multi-Dimensional Filter (Search, Date Range, District, Status) */}
       <div className="mb-4 space-y-3 rounded-2xl border border-gray-200 bg-white p-3.5 sm:p-4 shadow-xs">
+        {/* Baris 1: Search Bar & Info Count */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          {/* Search Box Modern */}
           <div className="relative flex-1 max-w-md">
             <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -501,8 +555,81 @@ export default function AdminTable({
           </div>
         </div>
 
-        {/* Status Filter Tabs (Pill style dengan badge bulat) */}
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-3">
+        {/* Baris 2: Filter Multi-Dimensi (Grid Responsive) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2.5 border-t border-gray-100">
+          {/* Dari Tanggal */}
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+              Dari Tgl
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-1 focus:ring-[#002B49] outline-none"
+            />
+          </div>
+
+          {/* Sampai Tanggal */}
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+              Sampai Tgl
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-1 focus:ring-[#002B49] outline-none"
+            />
+          </div>
+
+          {/* Dropdown Kecamatan */}
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+              Kecamatan / Wilayah
+            </label>
+            <select
+              value={selectedDistrict}
+              onChange={(e) => setSelectedDistrict(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-1 focus:ring-[#002B49] outline-none"
+            >
+              <option value="SEMUA">Semua Kecamatan</option>
+              {availableDistricts.map((d) => (
+                <option key={d} value={d}>
+                  Kec. {d}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Tombol Reset Filter */}
+          <div className="flex items-end">
+            {hasActiveFilter ? (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50/70 hover:bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 transition"
+              >
+                <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                <span>Reset Filter</span>
+              </button>
+            ) : (
+              <div className="text-[11px] text-gray-400 py-1.5 italic">
+                Filter aktif: Semua data
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Baris 3: Status Filter Tabs (Pill Style) */}
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-2.5">
           <button
             type="button"
             onClick={() => setSelectedTab("SEMUA")}
@@ -596,8 +723,8 @@ export default function AdminTable({
         </div>
       </div>
 
-      {/* Main Table: 7 Kolom Bersih, 100% pas di desktop */}
-      <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-xs">
+      {/* Main Table: 7 Kolom Bersih, Responsif, & Tombol Aksi Selalu Sejajar Vertikal */}
+      <div className="w-full overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-xs">
         <table className="w-full text-left text-sm divide-y divide-gray-200">
           <thead className="bg-slate-50/80 text-xs font-semibold uppercase tracking-wider text-gray-600">
             <tr>
@@ -607,14 +734,16 @@ export default function AdminTable({
               <th className="px-4 py-3.5">Status &amp; Proses</th>
               <th className="px-4 py-3.5">Jadwal Pemeriksaan</th>
               <th className="px-4 py-3.5">Petugas</th>
-              <th className="px-4 py-3.5 text-center">Aksi</th>
+              <th className="whitespace-nowrap px-3 py-3 text-right w-[230px] min-w-[230px]">
+                Aksi
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-gray-900">
             {filteredRows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
-                  {searchQuery || selectedTab !== "SEMUA"
+                  {hasActiveFilter
                     ? "Tidak ada berkas yang sesuai dengan filter pencarian."
                     : "Belum ada berkas terdaftar."}
                 </td>
@@ -712,138 +841,165 @@ export default function AdminTable({
                   )}
                 </td>
 
-                {/* 7. AKSI: Kompak, rapi, tidak wrap */}
-                <td className="px-4 py-3.5">
-                  <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-                    {/* Status Utama */}
+                {/* 7. AKSI: Penyelarasan Terkunci (Fixed Widths, 100% lurus ke bawah) */}
+                <td className="whitespace-nowrap px-3 py-3 text-right w-[230px] min-w-[230px]">
+                  <div className="flex items-center justify-end gap-1.5 w-full">
+                    {/* Tombol Status Utama (Lebar tetap w-28) */}
                     {r.status === "VERIFIKASI_PETUGAS" && (
                       <button
+                        type="button"
                         onClick={() => openSchedule(r, false)}
-                        className="rounded-lg bg-blue-700 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-blue-800 transition"
+                        title="Atur jadwal pemeriksaan lapangan"
+                        className="w-28 shrink-0 text-center text-xs py-1.5 font-semibold rounded-lg truncate bg-blue-700 hover:bg-blue-800 text-white shadow-xs transition"
                       >
                         Atur Jadwal
                       </button>
                     )}
                     {r.status === "DIJADWALKAN" && (
                       <button
+                        type="button"
                         onClick={() => openComplete(r)}
-                        className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
+                        title="Tandai proses pemeriksaan selesai"
+                        className="w-28 shrink-0 text-center text-xs py-1.5 font-semibold rounded-lg truncate bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
                       >
                         Selesai
                       </button>
                     )}
                     {r.status === "MENUNGGU_DOKUMEN" && (
                       <button
+                        type="button"
                         onClick={() => openDocs(r)}
-                        className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                        title="Catat atau perbarui dokumen kurang"
+                        className="w-28 shrink-0 text-center text-xs py-1.5 font-semibold rounded-lg truncate border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 transition"
                       >
                         Catat Dokumen
                       </button>
                     )}
                     {r.status === "SELESAI" && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <span className="w-28 shrink-0 inline-flex items-center justify-center gap-1 text-center text-xs py-1.5 font-semibold rounded-lg truncate border border-emerald-200 bg-emerald-50 text-emerald-800">
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                         </svg>
                         Tuntas
                       </span>
                     )}
 
-                    {/* Tombol Riwayat */}
+                    {/* Tombol Riwayat (Lebar tetap w-16) */}
                     <button
+                      type="button"
                       onClick={() => openHistory(r)}
                       title="Lihat riwayat kedatangan & konsultasi pemohon"
-                      className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition"
+                      className="w-16 shrink-0 text-center text-xs py-1.5 font-medium rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 transition"
                     >
                       Riwayat
                     </button>
 
-                    {/* Dropdown Menu Titik Tiga (...) */}
-                    <div className="relative" data-action-menu="true">
+                    {/* Tombol Titik Tiga (Lebar tetap w-8 h-8) */}
+                    <div className="relative shrink-0" data-action-menu="true">
                       <button
                         type="button"
                         onClick={() => setOpenActionMenuId(openActionMenuId === r.id ? null : r.id)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition"
+                        className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-slate-100 text-gray-600 transition"
                         title="Menu Aksi Lainnya"
                         aria-expanded={openActionMenuId === r.id}
                       >
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                        </svg>
+                        <span className="text-base font-bold leading-none">⋮</span>
                       </button>
 
+                      {/* Dropdown Menu Mengambang Berkelompok */}
                       {openActionMenuId === r.id && (
-                        <div className="absolute right-0 top-full z-30 mt-1 w-52 rounded-xl border border-gray-200 bg-white p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100">
-                          {/* Cetak Lembar Registrasi */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenActionMenuId(null);
-                              openReceipt(r);
-                            }}
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-gray-700 hover:bg-slate-100 transition"
-                          >
-                            <span className="text-sm">🖨️</span>
-                            <span>Cetak Lembar Registrasi</span>
-                          </button>
-
-                          {/* Edit Identitas Berkas */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenActionMenuId(null);
-                              openEdit(r);
-                            }}
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-gray-700 hover:bg-slate-100 transition"
-                          >
-                            <span className="text-sm">✏️</span>
-                            <span>Edit Identitas Berkas</span>
-                          </button>
-
-                          {/* Catat Dokumen Kurang (jika belum dijadwalkan/selesai) */}
-                          {(r.status === "MENUNGGU_DOKUMEN" || r.status === "VERIFIKASI_PETUGAS") && (
+                        <div className="absolute right-0 mt-1.5 w-56 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl z-30 text-xs text-left divide-y divide-gray-100">
+                          {/* Bagian Cetak */}
+                          <div className="py-1">
+                            <div className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                              Cetak
+                            </div>
                             <button
                               type="button"
                               onClick={() => {
                                 setOpenActionMenuId(null);
-                                openDocs(r);
+                                openReceipt(r);
                               }}
-                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-amber-700 hover:bg-amber-50 transition"
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-gray-700 hover:bg-slate-100 transition"
                             >
-                              <span className="text-sm">📋</span>
-                              <span>Catat / Ubah Dokumen Kurang</span>
+                              <svg className="h-3.5 w-3.5 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                              </svg>
+                              <span>Cetak Tanda Terima</span>
                             </button>
-                          )}
+                          </div>
 
-                          {/* Ubah Jadwal (jika status DIJADWALKAN) */}
-                          {r.status === "DIJADWALKAN" && (
+                          {/* Bagian Pengelolaan */}
+                          <div className="py-1">
+                            <div className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                              Pengelolaan
+                            </div>
                             <button
                               type="button"
                               onClick={() => {
                                 setOpenActionMenuId(null);
-                                openSchedule(r, true);
+                                openEdit(r);
                               }}
-                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-blue-700 hover:bg-blue-50 transition"
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-gray-700 hover:bg-slate-100 transition"
                             >
-                              <span className="text-sm">📅</span>
-                              <span>Ubah Jadwal Pemeriksaan</span>
+                              <svg className="h-3.5 w-3.5 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              <span>Edit Identitas Berkas</span>
                             </button>
-                          )}
 
-                          <div className="my-1 border-t border-gray-100" />
+                            {(r.status === "MENUNGGU_DOKUMEN" || r.status === "VERIFIKASI_PETUGAS") && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionMenuId(null);
+                                  openDocs(r);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-amber-700 hover:bg-amber-50 transition"
+                              >
+                                <svg className="h-3.5 w-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                                <span>Catat / Lengkapi Dokumen</span>
+                              </button>
+                            )}
 
-                          {/* Hapus Berkas */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenActionMenuId(null);
-                              openDelete(r);
-                            }}
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 transition"
-                          >
-                            <span className="text-sm">🗑️</span>
-                            <span>Hapus Berkas (Soft Delete)</span>
-                          </button>
+                            {r.status === "DIJADWALKAN" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionMenuId(null);
+                                  openSchedule(r, true);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-blue-700 hover:bg-blue-50 transition"
+                              >
+                                <svg className="h-3.5 w-3.5 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span>Ubah Jadwal Pemeriksaan</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Bagian Tindakan Bahaya */}
+                          <div className="py-1">
+                            <div className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-400">
+                              Tindakan Bahaya
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                openDelete(r);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-red-600 hover:bg-red-50 transition"
+                            >
+                              <svg className="h-3.5 w-3.5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              <span>Hapus Berkas (Arsip)</span>
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
