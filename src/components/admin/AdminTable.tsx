@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import {
   addVisitLog,
   createApplication,
@@ -73,10 +73,18 @@ type Dialog =
 
 function Blocker({ row }: { row: AdminRow }) {
   if (row.status === "MENUNGGU_DOKUMEN") {
-    return <span className="text-red-700">Menunggu pemohon · {row.daysInStage} hari</span>;
+    return (
+      <span className="text-red-700">
+        Menunggu pemohon · {row.daysInStage} hari
+      </span>
+    );
   }
   if (row.status === "VERIFIKASI_PETUGAS") {
-    return <span className="text-amber-700">Antrean petugas · {row.daysInStage} hari</span>;
+    return (
+      <span className="text-amber-700">
+        Antrean petugas · {row.daysInStage} hari
+      </span>
+    );
   }
   return <span className="text-gray-400">-</span>;
 }
@@ -153,20 +161,6 @@ export default function AdminTable({
     setError(null);
   }
 
-  // Load visit logs whenever dialog kind is "history"
-  useEffect(() => {
-    if (dialog?.kind === "history") {
-      setLoadingVisits(true);
-      setVisitDateInput(new Date().toISOString().slice(0, 10));
-      setVisitNotesInput("");
-      void getVisitLogs(dialog.row.id).then((res) => {
-        setLoadingVisits(false);
-        if (res.ok) setVisitLogs(res.visits);
-        else setError(res.error);
-      });
-    }
-  }, [dialog]);
-
   function openSchedule(row: AdminRow, edit: boolean) {
     setDate(edit ? (row.inspectionDate ?? "") : "");
     setTime(edit ? (row.inspectionTime ?? "09:00") : "09:00");
@@ -222,13 +216,26 @@ export default function AdminTable({
     setDialog({ kind: "delete", row });
   }
 
-  function openHistory(row: AdminRow) {
+  async function openHistory(row: AdminRow) {
     setError(null);
+    setVisitDateInput(new Date().toISOString().slice(0, 10));
+    setVisitNotesInput("");
+    setLoadingVisits(true);
+    setVisitLogs([]);
     setDialog({ kind: "history", row });
+    const res = await getVisitLogs(row.id);
+    if (res.ok) {
+      setVisitLogs(res.visits);
+    } else {
+      setError(res.error);
+    }
+    setLoadingVisits(false);
   }
 
   function toggleOfficer(id: string) {
-    setSelectedOfficers((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+    setSelectedOfficers((s) =>
+      s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
+    );
   }
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>) {
@@ -244,7 +251,8 @@ export default function AdminTable({
     if (dialog?.kind !== "schedule") return;
     if (!date) return setError("Tanggal pemeriksaan wajib diisi.");
     if (!time) return setError("Jam pemeriksaan wajib diisi.");
-    if (selectedOfficers.length === 0) return setError("Pilih minimal satu petugas.");
+    if (selectedOfficers.length === 0)
+      return setError("Pilih minimal satu petugas.");
     setError(null);
     const payload = {
       applicationId: dialog.row.id,
@@ -253,17 +261,27 @@ export default function AdminTable({
       notes,
       officerIds: selectedOfficers,
     };
-    run(() => (dialog.edit ? updateSchedule(payload) : createSchedule(payload)));
+    run(() =>
+      dialog.edit ? updateSchedule(payload) : createSchedule(payload),
+    );
   }
 
   function submitNew(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!ticketNumber.trim() || !applicantName.trim() || !objectAddress.trim()) {
+    if (
+      !ticketNumber.trim() ||
+      !applicantName.trim() ||
+      !objectAddress.trim()
+    ) {
       return setError("Semua kolom wajib diisi.");
     }
     setError(null);
     startTransition(async () => {
-      const res = await createApplication({ ticketNumber, applicantName, objectAddress });
+      const res = await createApplication({
+        ticketNumber,
+        applicantName,
+        objectAddress,
+      });
       if (res.ok) {
         setError(null);
         setDialog({ kind: "receipt", receipt: res.receipt });
@@ -276,7 +294,11 @@ export default function AdminTable({
   function submitEdit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "edit") return;
-    if (!ticketNumber.trim() || !applicantName.trim() || !objectAddress.trim()) {
+    if (
+      !ticketNumber.trim() ||
+      !applicantName.trim() ||
+      !objectAddress.trim()
+    ) {
       return setError("Semua kolom wajib diisi.");
     }
     setError(null);
@@ -320,7 +342,11 @@ export default function AdminTable({
     }
     setError(null);
     setLoadingVisits(true);
-    const res = await addVisitLog(dialog.row.id, visitDateInput, visitNotesInput);
+    const res = await addVisitLog(
+      dialog.row.id,
+      visitDateInput,
+      visitNotesInput,
+    );
     if (!res.ok) {
       setLoadingVisits(false);
       setError(res.error);
@@ -349,7 +375,13 @@ export default function AdminTable({
       const matchDate =
         r.createdAt.toLowerCase().includes(q) ||
         (r.inspectionDate && r.inspectionDate.toLowerCase().includes(q));
-      if (!matchTicket && !matchName && !matchAddress && !matchFirstVisit && !matchDate) {
+      if (
+        !matchTicket &&
+        !matchName &&
+        !matchAddress &&
+        !matchFirstVisit &&
+        !matchDate
+      ) {
         return false;
       }
     }
@@ -359,7 +391,9 @@ export default function AdminTable({
   // Tab counts
   const countAll = rows.length;
   const countDocs = rows.filter((r) => r.status === "MENUNGGU_DOKUMEN").length;
-  const countVerify = rows.filter((r) => r.status === "VERIFIKASI_PETUGAS").length;
+  const countVerify = rows.filter(
+    (r) => r.status === "VERIFIKASI_PETUGAS",
+  ).length;
   const countScheduled = rows.filter((r) => r.status === "DIJADWALKAN").length;
   const countDone = rows.filter((r) => r.status === "SELESAI").length;
 
@@ -387,7 +421,11 @@ export default function AdminTable({
       escapeCsv(STATUS_LABEL[r.status]),
       escapeCsv(r.daysInProcess),
       escapeCsv(r.daysInStage),
-      escapeCsv(r.inspectionDate ? `${r.inspectionDate} ${r.inspectionTime ?? ""}`.trim() : "-"),
+      escapeCsv(
+        r.inspectionDate
+          ? `${r.inspectionDate} ${r.inspectionTime ?? ""}`.trim()
+          : "-",
+      ),
       escapeCsv(r.officerNames.length ? r.officerNames.join(", ") : "-"),
       escapeCsv(r.missingDocuments ?? "-"),
       escapeCsv(r.officialFileNumber ?? "-"),
@@ -395,7 +433,10 @@ export default function AdminTable({
 
     const csvContent =
       "\uFEFF" +
-      [headers.map((h) => `"${h}"`).join(","), ...csvRows.map((row) => row.join(","))].join("\r\n");
+      [
+        headers.map((h) => `"${h}"`).join(","),
+        ...csvRows.map((row) => row.join(",")),
+      ].join("\r\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -415,9 +456,12 @@ export default function AdminTable({
       {/* Top action row */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-[#002B49]">Pemantauan Berkas Permohonan</h2>
+          <h2 className="text-xl font-bold text-[#002B49]">
+            Pemantauan Berkas Permohonan
+          </h2>
           <p className="text-xs text-gray-500">
-            Total {rows.length} berkas terdaftar · Real-time status &amp; pemeriksaan lapangan
+            Total {rows.length} berkas terdaftar · Real-time status &amp;
+            pemeriksaan lapangan
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -457,7 +501,12 @@ export default function AdminTable({
           {/* Search Box */}
           <div className="relative flex-1 max-w-md">
             <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -485,7 +534,8 @@ export default function AdminTable({
           </div>
 
           <div className="text-xs text-gray-500">
-            Menampilkan <strong>{filteredRows.length}</strong> dari <strong>{rows.length}</strong> berkas
+            Menampilkan <strong>{filteredRows.length}</strong> dari{" "}
+            <strong>{rows.length}</strong> berkas
           </div>
         </div>
 
@@ -561,7 +611,9 @@ export default function AdminTable({
               <th className="px-3 py-3">Status</th>
               <th className="px-3 py-3 whitespace-nowrap">Lama Proses</th>
               <th className="px-3 py-3 whitespace-nowrap">Hambatan</th>
-              <th className="px-3 py-3 whitespace-nowrap">Tanggal Jadwal</th>
+              <th className="px-3 py-3 whitespace-nowrap">
+                Tanggal Jadwal Pemeriksaan
+              </th>
               <th className="px-3 py-3">Petugas</th>
               <th className="px-3 py-3 text-center">Aksi</th>
             </tr>
@@ -569,7 +621,10 @@ export default function AdminTable({
           <tbody className="divide-y divide-gray-100 text-gray-900">
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                <td
+                  colSpan={10}
+                  className="px-4 py-8 text-center text-gray-500"
+                >
                   {searchQuery || selectedTab !== "SEMUA"
                     ? "Tidak ada berkas yang sesuai dengan filter pencarian."
                     : "Belum ada berkas terdaftar."}
@@ -577,7 +632,10 @@ export default function AdminTable({
               </tr>
             )}
             {filteredRows.map((r) => (
-              <tr key={r.id} className="align-top hover:bg-slate-50/80 transition-colors">
+              <tr
+                key={r.id}
+                className="align-top hover:bg-slate-50/80 transition-colors"
+              >
                 <td className="whitespace-nowrap px-3 py-3 font-semibold text-[#002B49]">
                   {r.ticketNumber}
                 </td>
@@ -585,7 +643,9 @@ export default function AdminTable({
                   {formatIndoDate(r.firstVisitDate)}
                 </td>
                 <td className="px-3 py-3 font-medium">{r.applicantName}</td>
-                <td className="px-3 py-3 text-xs text-gray-600 max-w-xs">{r.address}</td>
+                <td className="px-3 py-3 text-xs text-gray-600 max-w-xs">
+                  {r.address}
+                </td>
                 <td className="px-3 py-3">
                   <span
                     className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[r.status]}`}
@@ -599,7 +659,10 @@ export default function AdminTable({
                   )}
                   {r.status === "SELESAI" && r.officialFileNumber && (
                     <p className="mt-1 text-xs text-gray-600">
-                      No. Resmi: <strong className="text-emerald-700">{r.officialFileNumber}</strong>
+                      No. Resmi:{" "}
+                      <strong className="text-emerald-700">
+                        {r.officialFileNumber}
+                      </strong>
                     </p>
                   )}
                 </td>
@@ -610,7 +673,9 @@ export default function AdminTable({
                   <Blocker row={r} />
                 </td>
                 <td className="whitespace-nowrap px-3 py-3 text-xs">
-                  {r.inspectionDate ? `${r.inspectionDate} ${r.inspectionTime ?? ""} WIB` : "-"}
+                  {r.inspectionDate
+                    ? `${r.inspectionDate} ${r.inspectionTime ?? ""} WIB`
+                    : "-"}
                 </td>
                 <td className="px-3 py-3 text-xs text-gray-700">
                   {r.officerNames.length ? r.officerNames.join(", ") : "-"}
@@ -700,23 +765,35 @@ export default function AdminTable({
         <Modal titleId="history-title" maxWidth="max-w-xl">
           <div className="space-y-4">
             <div className="border-b border-gray-200 pb-3">
-              <h2 id="history-title" className="text-lg font-bold text-gray-900">
+              <h2
+                id="history-title"
+                className="text-lg font-bold text-gray-900"
+              >
                 Riwayat Kedatangan Pemohon
               </h2>
               <p className="mt-0.5 text-xs text-gray-600">
-                No. Tiket: <strong className="text-[#002B49]">{dialog.row.ticketNumber}</strong> · Pemohon:{" "}
-                <strong>{dialog.row.applicantName}</strong>
+                No. Tiket:{" "}
+                <strong className="text-[#002B49]">
+                  {dialog.row.ticketNumber}
+                </strong>{" "}
+                · Pemohon: <strong>{dialog.row.applicantName}</strong>
               </p>
             </div>
 
             {/* Form Catat Kedatangan Baru */}
-            <form onSubmit={submitAddVisit} className="rounded-xl border border-gray-200 bg-slate-50 p-3 space-y-2">
+            <form
+              onSubmit={submitAddVisit}
+              className="rounded-xl border border-gray-200 bg-slate-50 p-3 space-y-2"
+            >
               <p className="text-xs font-bold uppercase tracking-wider text-gray-700">
                 + Catat Kedatangan / Konsultasi Baru
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
-                  <label htmlFor="visitDate" className="block text-xs font-medium text-gray-600">
+                  <label
+                    htmlFor="visitDate"
+                    className="block text-xs font-medium text-gray-600"
+                  >
                     Tanggal Datang
                   </label>
                   <input
@@ -729,7 +806,10 @@ export default function AdminTable({
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="visitNotes" className="block text-xs font-medium text-gray-600">
+                  <label
+                    htmlFor="visitNotes"
+                    className="block text-xs font-medium text-gray-600"
+                  >
                     Keterangan / Keperluan
                   </label>
                   <input
@@ -759,7 +839,9 @@ export default function AdminTable({
                 Linimasa Kunjungan ({visitLogs.length})
               </p>
               {loadingVisits && visitLogs.length === 0 ? (
-                <p className="py-4 text-center text-xs text-gray-500">Memuat riwayat...</p>
+                <p className="py-4 text-center text-xs text-gray-500">
+                  Memuat riwayat...
+                </p>
               ) : visitLogs.length === 0 ? (
                 <p className="py-4 text-center text-xs text-gray-500">
                   Belum ada riwayat kunjungan pemohon.
@@ -814,7 +896,10 @@ export default function AdminTable({
               Edit Identitas Berkas
             </h2>
             <div>
-              <label htmlFor="edit-tn" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="edit-tn"
+                className="block text-sm font-medium text-gray-700"
+              >
                 No. Tiket / Registrasi
               </label>
               <input
@@ -826,7 +911,10 @@ export default function AdminTable({
               />
             </div>
             <div>
-              <label htmlFor="edit-an" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="edit-an"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Nama Pemohon
               </label>
               <input
@@ -838,7 +926,10 @@ export default function AdminTable({
               />
             </div>
             <div>
-              <label htmlFor="edit-oa" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="edit-oa"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Alamat Bidang Tanah
               </label>
               <textarea
@@ -872,8 +963,8 @@ export default function AdminTable({
               <strong>{dialog.row.applicantName}</strong>?
             </p>
             <div className="rounded-lg bg-red-50 p-3 text-xs text-red-800 border border-red-200">
-              Berkas akan diarsipkan (soft-delete). Berkas ini tidak akan muncul lagi di pencarian publik
-              maupun daftar aktif petugas.
+              Berkas akan diarsipkan (soft-delete). Berkas ini tidak akan muncul
+              lagi di pencarian publik maupun daftar aktif petugas.
             </div>
             {error && (
               <p role="alert" className="text-sm text-red-600">
@@ -907,11 +998,15 @@ export default function AdminTable({
         <Modal titleId="schedule-title">
           <form onSubmit={submitSchedule} className="space-y-4">
             <h2 id="schedule-title" className="text-lg font-bold text-gray-900">
-              {dialog.edit ? "Ubah Jadwal" : "Atur Jadwal"} - {dialog.row.ticketNumber}
+              {dialog.edit ? "Ubah Jadwal" : "Atur Jadwal"} -{" "}
+              {dialog.row.ticketNumber}
             </h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="date" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="date"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Tanggal
                 </label>
                 <input
@@ -923,7 +1018,10 @@ export default function AdminTable({
                 />
               </div>
               <div>
-                <label htmlFor="time" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="time"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Jam (WIB)
                 </label>
                 <input
@@ -936,7 +1034,10 @@ export default function AdminTable({
               </div>
             </div>
             <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="notes"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Catatan untuk Pemohon
               </label>
               <textarea
@@ -948,17 +1049,23 @@ export default function AdminTable({
               />
             </div>
             <fieldset>
-              <legend className="text-sm font-medium text-gray-700">Petugas Lapangan</legend>
+              <legend className="text-sm font-medium text-gray-700">
+                Petugas Lapangan
+              </legend>
               <div className="mt-1 space-y-2">
                 {officers.map((o) => (
-                  <label key={o.id} className="flex items-center gap-2 text-sm text-gray-900">
+                  <label
+                    key={o.id}
+                    className="flex items-center gap-2 text-sm text-gray-900"
+                  >
                     <input
                       type="checkbox"
                       checked={selectedOfficers.includes(o.id)}
                       onChange={() => toggleOfficer(o.id)}
                       className="h-4 w-4"
                     />
-                    {o.name} <span className="text-gray-500">({o.position})</span>
+                    {o.name}{" "}
+                    <span className="text-gray-500">({o.position})</span>
                   </label>
                 ))}
               </div>
@@ -981,7 +1088,10 @@ export default function AdminTable({
               Tambah Berkas Baru
             </h2>
             <div>
-              <label htmlFor="tn" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="tn"
+                className="block text-sm font-medium text-gray-700"
+              >
                 No. Tiket / Registrasi
               </label>
               <input
@@ -994,7 +1104,10 @@ export default function AdminTable({
               />
             </div>
             <div>
-              <label htmlFor="an" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="an"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Nama Pemohon
               </label>
               <input
@@ -1006,7 +1119,10 @@ export default function AdminTable({
               />
             </div>
             <div>
-              <label htmlFor="oa" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="oa"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Alamat Bidang Tanah
               </label>
               <textarea
@@ -1036,19 +1152,25 @@ export default function AdminTable({
               Catat Dokumen Kurang - {dialog.row.ticketNumber}
             </h2>
             <div>
-              <label htmlFor="docs" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="docs"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Dokumen yang kurang (satu per baris)
               </label>
               <textarea
                 id="docs"
                 rows={5}
-                placeholder={"FC KTP batas tanah sebelah utara\nSurat sporadik belum ttd kades"}
+                placeholder={
+                  "FC KTP batas tanah sebelah utara\nSurat sporadik belum ttd kades"
+                }
                 value={docs}
                 onChange={(e) => setDocs(e.target.value)}
                 className={inputCls}
               />
               <p className="mt-1 text-xs text-gray-500">
-                Kosongkan jika dokumen sudah lengkap; berkas akan kembali ke status verifikasi petugas.
+                Kosongkan jika dokumen sudah lengkap; berkas akan kembali ke
+                status verifikasi petugas.
               </p>
             </div>
             <FormFooter
@@ -1074,7 +1196,10 @@ export default function AdminTable({
               Tandai Selesai - {dialog.row.ticketNumber}
             </h2>
             <div>
-              <label htmlFor="official" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="official"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Nomor Berkas Resmi BPN
               </label>
               <input
@@ -1086,7 +1211,8 @@ export default function AdminTable({
                 className={inputCls}
               />
               <p className="mt-1 text-xs text-gray-500">
-                Nomor dari aplikasi Sentuh Tanahku. Akan ditampilkan kepada pemohon.
+                Nomor dari aplikasi Sentuh Tanahku. Akan ditampilkan kepada
+                pemohon.
               </p>
             </div>
             <FormFooter

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { asc, desc, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
 import AdminTable, { type AdminRow } from "@/components/admin/AdminTable";
