@@ -217,18 +217,14 @@ export default function AdminTable({
   const [officerError, setOfficerError] = useState<string | null>(null);
   const [officerPending, setOfficerPending] = useState(false);
 
-  useEffect(() => {
-    setOfficerList(officers);
-  }, [officers]);
-
   // Ekstrak daftar unik kecamatan dari data alamat
-  const availableDistricts = useMemo(() => {
+  const districtOptions = useMemo(() => {
     const set = new Set<string>();
     rows.forEach((r) => {
-      const d = extractDistrict(r.address);
-      if (d) set.add(d);
+      const match = r.address.match(/Kec\.?\s*([^,]+)/i);
+      if (match) set.add(match[1].trim());
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "id"));
+    return Array.from(set).sort();
   }, [rows]);
 
   // Tutup dropdown saat klik di luar atau tekan tombol Escape
@@ -541,52 +537,54 @@ export default function AdminTable({
     selectedTab !== "SEMUA";
 
   // Filtered rows dengan kombinasi Status, Kecamatan, Rentang Tanggal, & Search Query
-  const filteredRows = rows.filter((r) => {
-    // 1. Filter Status Tab
-    if (selectedTab !== "SEMUA" && r.status !== selectedTab) {
-      return false;
-    }
-
-    // 2. Filter Kecamatan
-    if (selectedDistrict !== "SEMUA") {
-      const dist = extractDistrict(r.address);
-      const matchDistrict =
-        (dist && dist.toLowerCase() === selectedDistrict.toLowerCase()) ||
-        r.address.toLowerCase().includes(selectedDistrict.toLowerCase());
-      if (!matchDistrict) return false;
-    }
-
-    // 3. Filter Rentang Tanggal (berdasarkan tanggal masuk/kunjungan awal)
-    const entryDate = r.firstVisitDate || r.createdAt.slice(0, 10);
-    if (startDate && entryDate < startDate) {
-      return false;
-    }
-    if (endDate && entryDate > endDate) {
-      return false;
-    }
-
-    // 4. Filter Kata Kunci Pencarian
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      const matchTicket = r.ticketNumber.toLowerCase().includes(q);
-      const matchName = r.applicantName.toLowerCase().includes(q);
-      const matchAddress = r.address.toLowerCase().includes(q);
-      const matchFirstVisit = r.firstVisitDate.toLowerCase().includes(q);
-      const matchDate =
-        r.createdAt.toLowerCase().includes(q) ||
-        (r.inspectionDate && r.inspectionDate.toLowerCase().includes(q));
-      if (
-        !matchTicket &&
-        !matchName &&
-        !matchAddress &&
-        !matchFirstVisit &&
-        !matchDate
-      ) {
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      // 1. Filter Status Tab
+      if (selectedTab !== "SEMUA" && r.status !== selectedTab) {
         return false;
       }
-    }
-    return true;
-  });
+
+      // 2. Filter Kecamatan
+      if (selectedDistrict !== "SEMUA") {
+        const dist = extractDistrict(r.address);
+        const matchDistrict =
+          (dist && dist.toLowerCase() === selectedDistrict.toLowerCase()) ||
+          r.address.toLowerCase().includes(selectedDistrict.toLowerCase());
+        if (!matchDistrict) return false;
+      }
+
+      // 3. Filter Rentang Tanggal (berdasarkan tanggal masuk/kunjungan awal)
+      const entryDate = r.firstVisitDate || r.createdAt.slice(0, 10);
+      if (startDate && entryDate < startDate) {
+        return false;
+      }
+      if (endDate && entryDate > endDate) {
+        return false;
+      }
+
+      // 4. Filter Kata Kunci Pencarian
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const matchTicket = r.ticketNumber.toLowerCase().includes(q);
+        const matchName = r.applicantName.toLowerCase().includes(q);
+        const matchAddress = r.address.toLowerCase().includes(q);
+        const matchFirstVisit = r.firstVisitDate.toLowerCase().includes(q);
+        const matchDate =
+          r.createdAt.toLowerCase().includes(q) ||
+          (r.inspectionDate && r.inspectionDate.toLowerCase().includes(q));
+        if (
+          !matchTicket &&
+          !matchName &&
+          !matchAddress &&
+          !matchFirstVisit &&
+          !matchDate
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [rows, selectedTab, selectedDistrict, startDate, endDate, searchQuery]);
 
   // Tab counts
   const countAll = rows.length;
@@ -797,7 +795,7 @@ export default function AdminTable({
               className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-1 focus:ring-[#002B49] outline-none"
             >
               <option value="SEMUA">Semua Kecamatan</option>
-              {availableDistricts.map((d) => (
+              {districtOptions.map((d) => (
                 <option key={d} value={d}>
                   Kec. {d}
                 </option>
@@ -1304,7 +1302,7 @@ export default function AdminTable({
 
       {/* Datalist Pilihan Kecamatan dari Data yang Ada */}
       <datalist id="district-options">
-        {availableDistricts.map((d) => (
+        {districtOptions.map((d) => (
           <option key={d} value={d} />
         ))}
       </datalist>
