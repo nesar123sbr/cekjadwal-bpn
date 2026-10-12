@@ -1,4 +1,5 @@
 import type { SearchResult, SearchResultItem } from "@/actions/search";
+import { formatIndoTime } from "@/lib/utils";
 
 function formatDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -104,23 +105,45 @@ function ResultCard({ item }: { item: SearchResultItem }) {
           <Row label="Nomor Tiket">{item.ticketNumber}</Row>
           <Row label="Pemohon">{item.applicantName}</Row>
           <Row label="Tanggal">{formatDate(item.inspectionDate)}</Row>
-          <Row label="Jam">{item.inspectionTime} WIB</Row>
+          <Row label="Jam">{formatIndoTime(item.inspectionTime)}</Row>
           <Row label="Lokasi">{item.objectAddress}</Row>
           <Row label="Kunjungan Terakhir">
             {item.lastVisitDate ? formatShortDate(item.lastVisitDate) : "-"}
           </Row>
           <Row label="Petugas">
-            <ul className="space-y-1">
-              {item.officers.map((o) => (
-                <li key={`${o.name}-${o.position}`}>
-                  {o.name}
-                  <span className="block text-sm font-normal text-gray-600">
-                    {o.position}
-                    {o.role ? ` · ${o.role}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {item.officers.length > 0 ? (
+              <details className="group mt-1">
+                <summary className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-100/70 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-200/80 transition select-none">
+                  <span>Lihat Tim Petugas Lapangan (Klik untuk membuka)</span>
+                  <svg
+                    className="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-180"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </summary>
+                <ul className="mt-2.5 space-y-2 border-t border-emerald-200/60 pt-2 pl-1">
+                  {item.officers.map((o) => (
+                    <li key={`${o.name}-${o.position}`} className="text-sm">
+                      <span className="font-semibold text-gray-900">{o.name}</span>
+                      <span className="block text-xs text-gray-600">
+                        {o.position}
+                        {o.role ? ` · ${o.role}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : (
+              <span className="text-sm text-gray-500 italic">Belum ditentukan</span>
+            )}
           </Row>
         </dl>
         <div className="mt-5 rounded-xl border border-green-300 bg-white p-4 text-sm text-green-900">

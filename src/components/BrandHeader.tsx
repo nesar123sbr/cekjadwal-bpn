@@ -9,7 +9,7 @@ export default function BrandHeader({
     <header className="relative bg-[#002B49] text-white overflow-hidden">
       {/* Ornamen Latar Belakang Kontur Topografi Halus (Topographic Contour Pattern) */}
       <svg
-        className="pointer-events-none absolute inset-0 h-full w-full opacity-10"
+        className="pointer-events-none absolute inset-0 h-full w-full opacity-10 overflow-hidden mix-blend-overlay"
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 1200 160"
         preserveAspectRatio="none"

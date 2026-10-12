@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import {
   addVisitLog,
   createApplication,
@@ -16,6 +22,7 @@ import {
   markApplicationComplete,
   updateSchedule,
 } from "@/actions/schedule";
+import { addOfficer, deleteOfficer } from "@/actions/officer";
 import type { ApplicationStatus } from "@/db/schema";
 import ReceiptModal from "./ReceiptModal";
 
@@ -69,6 +76,7 @@ type Dialog =
   | { kind: "delete"; row: AdminRow }
   | { kind: "history"; row: AdminRow }
   | { kind: "receipt"; receipt: ReceiptData }
+  | { kind: "officers" }
   | null;
 
 function formatIndoDate(dateStr: string): string {
@@ -107,6 +115,57 @@ function extractDistrict(address: string): string | null {
   return match ? match[1].trim() : null;
 }
 
+function parseAddress(rawAddress: string): {
+  district: string;
+  village: string;
+  streetDetail: string;
+} {
+  if (!rawAddress) {
+    return { district: "", village: "", streetDetail: "" };
+  }
+
+  // Pola standar: [streetDetail, ](Desa/Kel.|Kel.|Desa) <village>, Kec. <district>
+  const regex =
+    /^(?:(.*),\s*)?(?:Desa\/Kel\.|Kel\.|Desa)\s+([^,]+),\s*Kec\.?\s+(.+)$/i;
+  const match = rawAddress.trim().match(regex);
+
+  if (match) {
+    return {
+      streetDetail: match[1]?.trim() ?? "",
+      village: match[2]?.trim() ?? "",
+      district: match[3]?.trim() ?? "",
+    };
+  }
+
+  // Pola parsial jika format memiliki Kec. atau Desa/Kel. tersendiri
+  const kecMatch = rawAddress.match(/Kec\.?\s+([^,]+)/i);
+  const desMatch = rawAddress.match(/(?:Desa\/Kel\.|Kel\.|Desa)\s+([^,]+)/i);
+
+  if (kecMatch || desMatch) {
+    const district = kecMatch ? kecMatch[1].trim() : "";
+    const village = desMatch ? desMatch[1].trim() : "";
+    const remaining = rawAddress
+      .replace(/(?:Desa\/Kel\.|Kel\.|Desa)\s+[^,]+/i, "")
+      .replace(/Kec\.?\s+[^,]+/i, "")
+      .replace(/,\s*,/g, ",")
+      .replace(/^[\s,]+|[\s,]+$/g, "")
+      .trim();
+
+    return {
+      district,
+      village,
+      streetDetail: remaining,
+    };
+  }
+
+  // Format lama bebas: tempatkan seluruhnya pada detail jalan
+  return {
+    district: "",
+    village: "",
+    streetDetail: rawAddress.trim(),
+  };
+}
+
 export default function AdminTable({
   rows,
   officers,
@@ -134,10 +193,12 @@ export default function AdminTable({
   const [notes, setNotes] = useState(DEFAULT_NOTES);
   const [selectedOfficers, setSelectedOfficers] = useState<string[]>([]);
 
-  // Form berkas baru / edit
+  // Form berkas baru / edit (Alamat Terstruktur)
   const [ticketNumber, setTicketNumber] = useState("");
   const [applicantName, setApplicantName] = useState("");
-  const [objectAddress, setObjectAddress] = useState("");
+  const [district, setDistrict] = useState("");
+  const [village, setVillage] = useState("");
+  const [streetDetail, setStreetDetail] = useState("");
 
   // Form dokumen kurang / nomor resmi
   const [docs, setDocs] = useState("");
@@ -148,6 +209,17 @@ export default function AdminTable({
   const [loadingVisits, setLoadingVisits] = useState(false);
   const [visitDateInput, setVisitDateInput] = useState("");
   const [visitNotesInput, setVisitNotesInput] = useState("");
+
+  // Kelola Petugas (Dinamis)
+  const [officerList, setOfficerList] = useState<OfficerOption[]>(officers);
+  const [officerNameInput, setOfficerNameInput] = useState("");
+  const [officerPositionInput, setOfficerPositionInput] = useState("");
+  const [officerError, setOfficerError] = useState<string | null>(null);
+  const [officerPending, setOfficerPending] = useState(false);
+
+  useEffect(() => {
+    setOfficerList(officers);
+  }, [officers]);
 
   // Ekstrak daftar unik kecamatan dari data alamat
   const availableDistricts = useMemo(() => {
@@ -181,6 +253,55 @@ export default function AdminTable({
   function close() {
     setDialog(null);
     setError(null);
+    setOfficerError(null);
+  }
+
+  function openOfficers() {
+    setOfficerError(null);
+    setOfficerNameInput("");
+    setOfficerPositionInput("");
+    setDialog({ kind: "officers" });
+  }
+
+  async function handleAddOfficer(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!officerNameInput.trim() || !officerPositionInput.trim()) {
+      setOfficerError("Nama dan jabatan petugas wajib diisi.");
+      return;
+    }
+    setOfficerError(null);
+    setOfficerPending(true);
+    const res = await addOfficer(
+      officerNameInput.trim(),
+      officerPositionInput.trim(),
+    );
+    setOfficerPending(false);
+    if (res.ok) {
+      if (res.officer) {
+        setOfficerList((prev) =>
+          [...prev, res.officer!].sort((a, b) =>
+            a.name.localeCompare(b.name, "id"),
+          ),
+        );
+      }
+      setOfficerNameInput("");
+      setOfficerPositionInput("");
+    } else {
+      setOfficerError(res.error);
+    }
+  }
+
+  async function handleDeleteOfficer(id: string) {
+    setOfficerError(null);
+    setOfficerPending(true);
+    const res = await deleteOfficer(id);
+    setOfficerPending(false);
+    if (res.ok) {
+      setOfficerList((prev) => prev.filter((o) => o.id !== id));
+      setSelectedOfficers((prev) => prev.filter((oId) => oId !== id));
+    } else {
+      setOfficerError(res.error);
+    }
   }
 
   function openSchedule(row: AdminRow, edit: boolean) {
@@ -220,15 +341,20 @@ export default function AdminTable({
   function openNew() {
     setTicketNumber("");
     setApplicantName("");
-    setObjectAddress("");
+    setDistrict("");
+    setVillage("");
+    setStreetDetail("");
     setError(null);
     setDialog({ kind: "new" });
   }
 
   function openEdit(row: AdminRow) {
+    const parsed = parseAddress(row.address);
     setTicketNumber(row.ticketNumber);
     setApplicantName(row.applicantName);
-    setObjectAddress(row.address);
+    setDistrict(parsed.district);
+    setVillage(parsed.village);
+    setStreetDetail(parsed.streetDetail);
     setError(null);
     setDialog({ kind: "edit", row });
   }
@@ -273,7 +399,8 @@ export default function AdminTable({
     if (dialog?.kind !== "schedule") return;
     if (!date) return setError("Tanggal pemeriksaan wajib diisi.");
     if (!time) return setError("Jam pemeriksaan wajib diisi.");
-    if (selectedOfficers.length === 0) return setError("Pilih minimal satu petugas.");
+    if (selectedOfficers.length === 0)
+      return setError("Pilih minimal satu petugas.");
     setError(null);
     const payload = {
       applicationId: dialog.row.id,
@@ -282,17 +409,35 @@ export default function AdminTable({
       notes,
       officerIds: selectedOfficers,
     };
-    run(() => (dialog.edit ? updateSchedule(payload) : createSchedule(payload)));
+    run(() =>
+      dialog.edit ? updateSchedule(payload) : createSchedule(payload),
+    );
   }
 
   function submitNew(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!ticketNumber.trim() || !applicantName.trim() || !objectAddress.trim()) {
-      return setError("Semua kolom wajib diisi.");
+    if (!ticketNumber.trim()) {
+      return setError("No. Tiket / Registrasi wajib diisi.");
     }
+    if (!applicantName.trim()) {
+      return setError("Nama pemohon wajib diisi.");
+    }
+    if (!district.trim()) {
+      return setError("Kecamatan bidang tanah wajib diisi.");
+    }
+    if (!village.trim()) {
+      return setError("Desa/Kelurahan bidang tanah wajib diisi.");
+    }
+
+    const objectAddress = `${streetDetail.trim() ? streetDetail.trim() + ", " : ""}Desa/Kel. ${village.trim()}, Kec. ${district.trim()}`;
+
     setError(null);
     startTransition(async () => {
-      const res = await createApplication({ ticketNumber, applicantName, objectAddress });
+      const res = await createApplication({
+        ticketNumber: ticketNumber.trim(),
+        applicantName: applicantName.trim(),
+        objectAddress,
+      });
       if (res.ok) {
         setError(null);
         setDialog({ kind: "receipt", receipt: res.receipt });
@@ -305,14 +450,26 @@ export default function AdminTable({
   function submitEdit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "edit") return;
-    if (!ticketNumber.trim() || !applicantName.trim() || !objectAddress.trim()) {
-      return setError("Semua kolom wajib diisi.");
+    if (!ticketNumber.trim()) {
+      return setError("No. Tiket / Registrasi wajib diisi.");
     }
+    if (!applicantName.trim()) {
+      return setError("Nama pemohon wajib diisi.");
+    }
+    if (!district.trim()) {
+      return setError("Kecamatan bidang tanah wajib diisi.");
+    }
+    if (!village.trim()) {
+      return setError("Desa/Kelurahan bidang tanah wajib diisi.");
+    }
+
+    const objectAddress = `${streetDetail.trim() ? streetDetail.trim() + ", " : ""}Desa/Kel. ${village.trim()}, Kec. ${district.trim()}`;
+
     setError(null);
     run(() =>
       updateApplication(dialog.row.id, {
-        ticketNumber,
-        applicantName,
+        ticketNumber: ticketNumber.trim(),
+        applicantName: applicantName.trim(),
         objectAddress,
       }),
     );
@@ -349,7 +506,11 @@ export default function AdminTable({
     }
     setError(null);
     setLoadingVisits(true);
-    const res = await addVisitLog(dialog.row.id, visitDateInput, visitNotesInput);
+    const res = await addVisitLog(
+      dialog.row.id,
+      visitDateInput,
+      visitNotesInput,
+    );
     if (!res.ok) {
       setLoadingVisits(false);
       setError(res.error);
@@ -414,7 +575,13 @@ export default function AdminTable({
       const matchDate =
         r.createdAt.toLowerCase().includes(q) ||
         (r.inspectionDate && r.inspectionDate.toLowerCase().includes(q));
-      if (!matchTicket && !matchName && !matchAddress && !matchFirstVisit && !matchDate) {
+      if (
+        !matchTicket &&
+        !matchName &&
+        !matchAddress &&
+        !matchFirstVisit &&
+        !matchDate
+      ) {
         return false;
       }
     }
@@ -424,7 +591,9 @@ export default function AdminTable({
   // Tab counts
   const countAll = rows.length;
   const countDocs = rows.filter((r) => r.status === "MENUNGGU_DOKUMEN").length;
-  const countVerify = rows.filter((r) => r.status === "VERIFIKASI_PETUGAS").length;
+  const countVerify = rows.filter(
+    (r) => r.status === "VERIFIKASI_PETUGAS",
+  ).length;
   const countScheduled = rows.filter((r) => r.status === "DIJADWALKAN").length;
   const countDone = rows.filter((r) => r.status === "SELESAI").length;
 
@@ -452,7 +621,11 @@ export default function AdminTable({
       escapeCsv(STATUS_LABEL[r.status]),
       escapeCsv(r.daysInProcess),
       escapeCsv(r.daysInStage),
-      escapeCsv(r.inspectionDate ? `${r.inspectionDate} ${r.inspectionTime ?? ""}`.trim() : "-"),
+      escapeCsv(
+        r.inspectionDate
+          ? `${r.inspectionDate} ${r.inspectionTime ?? ""}`.trim()
+          : "-",
+      ),
       escapeCsv(r.officerNames.length ? r.officerNames.join(", ") : "-"),
       escapeCsv(r.missingDocuments ?? "-"),
       escapeCsv(r.officialFileNumber ?? "-"),
@@ -460,7 +633,10 @@ export default function AdminTable({
 
     const csvContent =
       "\uFEFF" +
-      [headers.map((h) => `"${h}"`).join(","), ...csvRows.map((row) => row.join(","))].join("\r\n");
+      [
+        headers.map((h) => `"${h}"`).join(","),
+        ...csvRows.map((row) => row.join(",")),
+      ].join("\r\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -482,10 +658,31 @@ export default function AdminTable({
             Pemantauan Berkas Permohonan
           </h2>
           <p className="mt-0.5 text-xs text-gray-500">
-            Total {rows.length} berkas terdaftar · Real-time status &amp; pemeriksaan lapangan ATR/BPN
+            Total {rows.length} berkas terdaftar · Real-time status &amp;
+            pemeriksaan lapangan ATR/BPN
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={openOfficers}
+            type="button"
+            className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/70 px-3.5 py-2 text-sm font-semibold text-[#002B49] shadow-xs hover:bg-blue-100 transition"
+          >
+            <svg
+              className="h-4 w-4 text-[#002B49]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+              />
+            </svg>
+            Kelola Petugas
+          </button>
           <button
             onClick={handleExportCsv}
             type="button"
@@ -517,12 +714,17 @@ export default function AdminTable({
       </div>
 
       {/* Toolbar: Multi-Dimensional Filter (Search, Date Range, District, Status) */}
-      <div className="mb-4 space-y-3 rounded-2xl border border-gray-200 bg-white p-3.5 sm:p-4 shadow-xs">
+      <div className="mb-4 space-y-3 rounded-2xl border border-gray-200/90 bg-white/95 backdrop-blur-xs p-3.5 sm:p-4 shadow-xs">
         {/* Baris 1: Search Bar & Info Count */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="relative flex-1 max-w-md">
             <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -550,8 +752,9 @@ export default function AdminTable({
           </div>
 
           <div className="text-xs text-gray-500 font-medium">
-            Menampilkan <strong className="text-gray-900">{filteredRows.length}</strong> dari{" "}
-            <strong className="text-gray-900">{rows.length}</strong> berkas
+            Menampilkan{" "}
+            <strong className="text-gray-900">{filteredRows.length}</strong>{" "}
+            dari <strong className="text-gray-900">{rows.length}</strong> berkas
           </div>
         </div>
 
@@ -610,7 +813,12 @@ export default function AdminTable({
                 onClick={handleResetFilters}
                 className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50/70 hover:bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 transition"
               >
-                <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="h-3.5 w-3.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -642,7 +850,9 @@ export default function AdminTable({
             <span>Semua</span>
             <span
               className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                selectedTab === "SEMUA" ? "bg-white/20 text-white" : "bg-gray-200 text-gray-700"
+                selectedTab === "SEMUA"
+                  ? "bg-white/20 text-white"
+                  : "bg-gray-200 text-gray-700"
               }`}
             >
               {countAll}
@@ -660,7 +870,9 @@ export default function AdminTable({
             <span>Menunggu Dokumen</span>
             <span
               className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                selectedTab === "MENUNGGU_DOKUMEN" ? "bg-white/20 text-white" : "bg-red-100 text-red-800"
+                selectedTab === "MENUNGGU_DOKUMEN"
+                  ? "bg-white/20 text-white"
+                  : "bg-red-100 text-red-800"
               }`}
             >
               {countDocs}
@@ -678,7 +890,9 @@ export default function AdminTable({
             <span>Verifikasi Petugas</span>
             <span
               className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                selectedTab === "VERIFIKASI_PETUGAS" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"
+                selectedTab === "VERIFIKASI_PETUGAS"
+                  ? "bg-white/20 text-white"
+                  : "bg-amber-100 text-amber-800"
               }`}
             >
               {countVerify}
@@ -696,7 +910,9 @@ export default function AdminTable({
             <span>Dijadwalkan</span>
             <span
               className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                selectedTab === "DIJADWALKAN" ? "bg-white/20 text-white" : "bg-blue-100 text-blue-800"
+                selectedTab === "DIJADWALKAN"
+                  ? "bg-white/20 text-white"
+                  : "bg-blue-100 text-blue-800"
               }`}
             >
               {countScheduled}
@@ -714,7 +930,9 @@ export default function AdminTable({
             <span>Selesai</span>
             <span
               className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                selectedTab === "SELESAI" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
+                selectedTab === "SELESAI"
+                  ? "bg-white/20 text-white"
+                  : "bg-emerald-100 text-emerald-800"
               }`}
             >
               {countDone}
@@ -724,7 +942,7 @@ export default function AdminTable({
       </div>
 
       {/* Main Table: 7 Kolom Bersih, Responsif, & Tombol Aksi Selalu Sejajar Vertikal */}
-      <div className="w-full overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-xs">
+      <div className="w-full overflow-x-auto rounded-xl border border-gray-200/90 bg-white/95 backdrop-blur-xs shadow-xs">
         <table className="w-full text-left text-sm divide-y divide-gray-200">
           <thead className="bg-slate-50/80 text-xs font-semibold uppercase tracking-wider text-gray-600">
             <tr>
@@ -732,9 +950,9 @@ export default function AdminTable({
               <th className="px-4 py-3.5">Pemohon</th>
               <th className="px-4 py-3.5">Lokasi Tanah</th>
               <th className="px-4 py-3.5">Status &amp; Proses</th>
-              <th className="px-4 py-3.5">Jadwal Pemeriksaan</th>
+              <th className="px-4 py-3.5">Jadwal Pemeriksaan Tanah</th>
               <th className="px-4 py-3.5">Petugas</th>
-              <th className="whitespace-nowrap px-3 py-3 text-right w-[230px] min-w-[230px]">
+              <th className="whitespace-nowrap px-3 py-3 text-left font-semibold w-[230px] min-w-[230px]">
                 Aksi
               </th>
             </tr>
@@ -742,7 +960,10 @@ export default function AdminTable({
           <tbody className="divide-y divide-gray-100 text-gray-900">
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                <td
+                  colSpan={7}
+                  className="px-4 py-12 text-center text-gray-500"
+                >
                   {hasActiveFilter
                     ? "Tidak ada berkas yang sesuai dengan filter pencarian."
                     : "Belum ada berkas terdaftar."}
@@ -750,7 +971,10 @@ export default function AdminTable({
               </tr>
             )}
             {filteredRows.map((r) => (
-              <tr key={r.id} className="align-top hover:bg-slate-50/60 transition-colors">
+              <tr
+                key={r.id}
+                className="align-top hover:bg-slate-50/60 transition-colors"
+              >
                 {/* 1. NO. TIKET & TGL MASUK */}
                 <td className="px-4 py-3.5 whitespace-nowrap">
                   <div className="font-bold text-[#002B49] text-sm leading-tight">
@@ -842,8 +1066,8 @@ export default function AdminTable({
                 </td>
 
                 {/* 7. AKSI: Penyelarasan Terkunci (Fixed Widths, 100% lurus ke bawah) */}
-                <td className="whitespace-nowrap px-3 py-3 text-right w-[230px] min-w-[230px]">
-                  <div className="flex items-center justify-end gap-1.5 w-full">
+                <td className="whitespace-nowrap px-3 py-3 text-left w-[230px] min-w-[230px]">
+                  <div className="flex items-center justify-start gap-1.5 w-[220px]">
                     {/* Tombol Status Utama (Lebar tetap w-28) */}
                     {r.status === "VERIFIKASI_PETUGAS" && (
                       <button
@@ -877,8 +1101,18 @@ export default function AdminTable({
                     )}
                     {r.status === "SELESAI" && (
                       <span className="w-28 shrink-0 inline-flex items-center justify-center gap-1 text-center text-xs py-1.5 font-semibold rounded-lg truncate border border-emerald-200 bg-emerald-50 text-emerald-800">
-                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        <svg
+                          className="h-3.5 w-3.5 shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2.5}
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                         Tuntas
                       </span>
@@ -898,12 +1132,18 @@ export default function AdminTable({
                     <div className="relative shrink-0" data-action-menu="true">
                       <button
                         type="button"
-                        onClick={() => setOpenActionMenuId(openActionMenuId === r.id ? null : r.id)}
+                        onClick={() =>
+                          setOpenActionMenuId(
+                            openActionMenuId === r.id ? null : r.id,
+                          )
+                        }
                         className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-slate-100 text-gray-600 transition"
                         title="Menu Aksi Lainnya"
                         aria-expanded={openActionMenuId === r.id}
                       >
-                        <span className="text-base font-bold leading-none">⋮</span>
+                        <span className="text-base font-bold leading-none">
+                          ⋮
+                        </span>
                       </button>
 
                       {/* Dropdown Menu Mengambang Berkelompok */}
@@ -922,8 +1162,18 @@ export default function AdminTable({
                               }}
                               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-gray-700 hover:bg-slate-100 transition"
                             >
-                              <svg className="h-3.5 w-3.5 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                              <svg
+                                className="h-3.5 w-3.5 text-gray-500 shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                                />
                               </svg>
                               <span>Cetak Tanda Terima</span>
                             </button>
@@ -942,13 +1192,24 @@ export default function AdminTable({
                               }}
                               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-gray-700 hover:bg-slate-100 transition"
                             >
-                              <svg className="h-3.5 w-3.5 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              <svg
+                                className="h-3.5 w-3.5 text-gray-500 shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
                               </svg>
                               <span>Edit Identitas Berkas</span>
                             </button>
 
-                            {(r.status === "MENUNGGU_DOKUMEN" || r.status === "VERIFIKASI_PETUGAS") && (
+                            {(r.status === "MENUNGGU_DOKUMEN" ||
+                              r.status === "VERIFIKASI_PETUGAS") && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -957,8 +1218,18 @@ export default function AdminTable({
                                 }}
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-amber-700 hover:bg-amber-50 transition"
                               >
-                                <svg className="h-3.5 w-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                <svg
+                                  className="h-3.5 w-3.5 text-amber-600 shrink-0"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                  />
                                 </svg>
                                 <span>Catat / Lengkapi Dokumen</span>
                               </button>
@@ -973,8 +1244,18 @@ export default function AdminTable({
                                 }}
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-blue-700 hover:bg-blue-50 transition"
                               >
-                                <svg className="h-3.5 w-3.5 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <svg
+                                  className="h-3.5 w-3.5 text-blue-600 shrink-0"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                  />
                                 </svg>
                                 <span>Ubah Jadwal Pemeriksaan</span>
                               </button>
@@ -994,8 +1275,18 @@ export default function AdminTable({
                               }}
                               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-red-600 hover:bg-red-50 transition"
                             >
-                              <svg className="h-3.5 w-3.5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              <svg
+                                className="h-3.5 w-3.5 text-red-500 shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
                               </svg>
                               <span>Hapus Berkas (Arsip)</span>
                             </button>
@@ -1011,28 +1302,47 @@ export default function AdminTable({
         </table>
       </div>
 
+      {/* Datalist Pilihan Kecamatan dari Data yang Ada */}
+      <datalist id="district-options">
+        {availableDistricts.map((d) => (
+          <option key={d} value={d} />
+        ))}
+      </datalist>
+
       {/* Modal: Riwayat Kunjungan (Visit Logs) */}
       {dialog?.kind === "history" && (
         <Modal titleId="history-title" maxWidth="max-w-xl">
           <div className="space-y-4">
             <div className="border-b border-gray-200 pb-3">
-              <h2 id="history-title" className="text-lg font-bold text-gray-900">
+              <h2
+                id="history-title"
+                className="text-lg font-bold text-gray-900"
+              >
                 Riwayat Kedatangan Pemohon
               </h2>
               <p className="mt-0.5 text-xs text-gray-600">
-                No. Tiket: <strong className="text-[#002B49]">{dialog.row.ticketNumber}</strong> · Pemohon:{" "}
-                <strong>{dialog.row.applicantName}</strong>
+                No. Tiket:{" "}
+                <strong className="text-[#002B49]">
+                  {dialog.row.ticketNumber}
+                </strong>{" "}
+                · Pemohon: <strong>{dialog.row.applicantName}</strong>
               </p>
             </div>
 
             {/* Form Catat Kedatangan Baru */}
-            <form onSubmit={submitAddVisit} className="rounded-xl border border-gray-200 bg-slate-50 p-3 space-y-2">
+            <form
+              onSubmit={submitAddVisit}
+              className="rounded-xl border border-gray-200 bg-slate-50 p-3 space-y-2"
+            >
               <p className="text-xs font-bold uppercase tracking-wider text-gray-700">
                 + Catat Kedatangan / Konsultasi Baru
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
-                  <label htmlFor="visitDate" className="block text-xs font-medium text-gray-600">
+                  <label
+                    htmlFor="visitDate"
+                    className="block text-xs font-medium text-gray-600"
+                  >
                     Tanggal Datang
                   </label>
                   <input
@@ -1045,7 +1355,10 @@ export default function AdminTable({
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="visitNotes" className="block text-xs font-medium text-gray-600">
+                  <label
+                    htmlFor="visitNotes"
+                    className="block text-xs font-medium text-gray-600"
+                  >
                     Keterangan / Keperluan
                   </label>
                   <input
@@ -1075,7 +1388,9 @@ export default function AdminTable({
                 Linimasa Kunjungan ({visitLogs.length})
               </p>
               {loadingVisits && visitLogs.length === 0 ? (
-                <p className="py-4 text-center text-xs text-gray-500">Memuat riwayat...</p>
+                <p className="py-4 text-center text-xs text-gray-500">
+                  Memuat riwayat...
+                </p>
               ) : visitLogs.length === 0 ? (
                 <p className="py-4 text-center text-xs text-gray-500">
                   Belum ada riwayat kunjungan pemohon.
@@ -1124,47 +1439,111 @@ export default function AdminTable({
 
       {/* Modal: Edit Berkas */}
       {dialog?.kind === "edit" && (
-        <Modal titleId="edit-title">
+        <Modal titleId="edit-title" maxWidth="max-w-lg">
           <form onSubmit={submitEdit} className="space-y-4">
             <h2 id="edit-title" className="text-lg font-bold text-gray-900">
               Edit Identitas Berkas
             </h2>
             <div>
-              <label htmlFor="edit-tn" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="edit-tn"
+                className="block text-sm font-medium text-gray-700"
+              >
                 No. Tiket / Registrasi
               </label>
               <input
                 id="edit-tn"
                 type="text"
+                required
                 value={ticketNumber}
                 onChange={(e) => setTicketNumber(e.target.value)}
                 className={inputCls}
               />
             </div>
             <div>
-              <label htmlFor="edit-an" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="edit-an"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Nama Pemohon
               </label>
               <input
                 id="edit-an"
                 type="text"
+                required
                 value={applicantName}
                 onChange={(e) => setApplicantName(e.target.value)}
                 className={inputCls}
               />
             </div>
-            <div>
-              <label htmlFor="edit-oa" className="block text-sm font-medium text-gray-700">
-                Alamat Bidang Tanah
-              </label>
-              <textarea
-                id="edit-oa"
-                rows={3}
-                value={objectAddress}
-                onChange={(e) => setObjectAddress(e.target.value)}
-                className={inputCls}
-              />
+
+            {/* Input Alamat Bidang Tanah Terstruktur */}
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Lokasi Bidang Tanah
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label
+                    htmlFor="edit-dist"
+                    className="block text-xs font-medium text-gray-700"
+                  >
+                    Kecamatan <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="edit-dist"
+                    type="text"
+                    required
+                    list="district-options"
+                    placeholder="Contoh: Sidikalang / Coblong"
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="edit-vill"
+                    className="block text-xs font-medium text-gray-700"
+                  >
+                    Desa / Kelurahan <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="edit-vill"
+                    type="text"
+                    required
+                    placeholder="Contoh: Batang Beruh / Sukajadi"
+                    value={village}
+                    onChange={(e) => setVillage(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-street"
+                  className="block text-xs font-medium text-gray-700"
+                >
+                  Detail Alamat / Jalan / Dusun / No{" "}
+                  <span className="text-gray-400 font-normal">(Opsional)</span>
+                </label>
+                <input
+                  id="edit-street"
+                  type="text"
+                  placeholder="Contoh: Jl. S.M Raja No. 12, Dusun II"
+                  value={streetDetail}
+                  onChange={(e) => setStreetDetail(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div className="text-[11px] text-gray-500 italic">
+                Format tersimpan:{" "}
+                <span className="font-semibold text-gray-700">
+                  {`${streetDetail.trim() ? streetDetail.trim() + ", " : ""}Desa/Kel. ${village.trim() || "..."}, Kec. ${district.trim() || "..."}`}
+                </span>
+              </div>
             </div>
+
             <FormFooter
               error={error}
               pending={pending}
@@ -1188,8 +1567,8 @@ export default function AdminTable({
               <strong>{dialog.row.applicantName}</strong>?
             </p>
             <div className="rounded-lg bg-red-50 p-3 text-xs text-red-800 border border-red-200">
-              Berkas akan diarsipkan (soft-delete). Berkas ini tidak akan muncul lagi di pencarian publik
-              maupun daftar aktif petugas.
+              Berkas akan diarsipkan (soft-delete). Berkas ini tidak akan muncul
+              lagi di pencarian publik maupun daftar aktif petugas.
             </div>
             {error && (
               <p role="alert" className="text-sm text-red-600">
@@ -1223,11 +1602,15 @@ export default function AdminTable({
         <Modal titleId="schedule-title">
           <form onSubmit={submitSchedule} className="space-y-4">
             <h2 id="schedule-title" className="text-lg font-bold text-gray-900">
-              {dialog.edit ? "Ubah Jadwal" : "Atur Jadwal"} - {dialog.row.ticketNumber}
+              {dialog.edit ? "Ubah Jadwal" : "Atur Jadwal"} -{" "}
+              {dialog.row.ticketNumber}
             </h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="date" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="date"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Tanggal
                 </label>
                 <input
@@ -1239,7 +1622,10 @@ export default function AdminTable({
                 />
               </div>
               <div>
-                <label htmlFor="time" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="time"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Jam (WIB)
                 </label>
                 <input
@@ -1252,7 +1638,10 @@ export default function AdminTable({
               </div>
             </div>
             <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="notes"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Catatan untuk Pemohon
               </label>
               <textarea
@@ -1264,19 +1653,32 @@ export default function AdminTable({
               />
             </div>
             <fieldset>
-              <legend className="text-sm font-medium text-gray-700">Petugas Lapangan</legend>
+              <legend className="text-sm font-medium text-gray-700">
+                Petugas Lapangan
+              </legend>
               <div className="mt-1 space-y-2">
-                {officers.map((o) => (
-                  <label key={o.id} className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedOfficers.includes(o.id)}
-                      onChange={() => toggleOfficer(o.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-[#002B49] focus:ring-[#002B49]"
-                    />
-                    {o.name} <span className="text-gray-500">({o.position})</span>
-                  </label>
-                ))}
+                {officerList.length === 0 ? (
+                  <p className="text-xs text-gray-500 italic py-1">
+                    Belum ada data petugas. Silakan tambahkan melalui menu
+                    `Kelola Petugas`.
+                  </p>
+                ) : (
+                  officerList.map((o) => (
+                    <label
+                      key={o.id}
+                      className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedOfficers.includes(o.id)}
+                        onChange={() => toggleOfficer(o.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-[#002B49] focus:ring-[#002B49]"
+                      />
+                      {o.name}{" "}
+                      <span className="text-gray-500">({o.position})</span>
+                    </label>
+                  ))
+                )}
               </div>
             </fieldset>
             <FormFooter
@@ -1291,18 +1693,22 @@ export default function AdminTable({
 
       {/* Modal: Tambah Berkas Baru */}
       {dialog?.kind === "new" && (
-        <Modal titleId="new-title">
+        <Modal titleId="new-title" maxWidth="max-w-lg">
           <form onSubmit={submitNew} className="space-y-4">
             <h2 id="new-title" className="text-lg font-bold text-gray-900">
               Tambah Berkas Baru
             </h2>
             <div>
-              <label htmlFor="tn" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="tn"
+                className="block text-sm font-medium text-gray-700"
+              >
                 No. Tiket / Registrasi
               </label>
               <input
                 id="tn"
                 type="text"
+                required
                 placeholder="Contoh: REG-1204/2026"
                 value={ticketNumber}
                 onChange={(e) => setTicketNumber(e.target.value)}
@@ -1310,30 +1716,90 @@ export default function AdminTable({
               />
             </div>
             <div>
-              <label htmlFor="an" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="an"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Nama Pemohon
               </label>
               <input
                 id="an"
                 type="text"
+                required
+                placeholder="Contoh: Hendra Sihombing"
                 value={applicantName}
                 onChange={(e) => setApplicantName(e.target.value)}
                 className={inputCls}
               />
             </div>
-            <div>
-              <label htmlFor="oa" className="block text-sm font-medium text-gray-700">
-                Alamat Bidang Tanah
-              </label>
-              <textarea
-                id="oa"
-                rows={3}
-                placeholder="Jl. ..., Kel. ..., Kec. ..."
-                value={objectAddress}
-                onChange={(e) => setObjectAddress(e.target.value)}
-                className={inputCls}
-              />
+
+            {/* Input Alamat Bidang Tanah Terstruktur */}
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Lokasi Bidang Tanah
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label
+                    htmlFor="new-dist"
+                    className="block text-xs font-medium text-gray-700"
+                  >
+                    Kecamatan <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="new-dist"
+                    type="text"
+                    required
+                    list="district-options"
+                    placeholder="Contoh: Sidikalang / Coblong"
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="new-vill"
+                    className="block text-xs font-medium text-gray-700"
+                  >
+                    Desa / Kelurahan <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="new-vill"
+                    type="text"
+                    required
+                    placeholder="Contoh: Batang Beruh / Sukajadi"
+                    value={village}
+                    onChange={(e) => setVillage(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+              <div>
+                <label
+                  htmlFor="new-street"
+                  className="block text-xs font-medium text-gray-700"
+                >
+                  Detail Alamat / Jalan / Dusun / No{" "}
+                  <span className="text-gray-400 font-normal">(Opsional)</span>
+                </label>
+                <input
+                  id="new-street"
+                  type="text"
+                  placeholder="Contoh: Jl. S.M Raja No. 12, Dusun II"
+                  value={streetDetail}
+                  onChange={(e) => setStreetDetail(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div className="text-[11px] text-gray-500 italic">
+                Format tersimpan:{" "}
+                <span className="font-semibold text-gray-700">
+                  {`${streetDetail.trim() ? streetDetail.trim() + ", " : ""}Desa/Kel. ${village.trim() || "..."}, Kec. ${district.trim() || "..."}`}
+                </span>
+              </div>
             </div>
+
             <FormFooter
               error={error}
               pending={pending}
@@ -1352,19 +1818,25 @@ export default function AdminTable({
               Catat Dokumen Kurang - {dialog.row.ticketNumber}
             </h2>
             <div>
-              <label htmlFor="docs" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="docs"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Dokumen yang kurang (satu per baris)
               </label>
               <textarea
                 id="docs"
                 rows={5}
-                placeholder={"FC KTP batas tanah sebelah utara\nSurat sporadik belum ttd kades"}
+                placeholder={
+                  "FC KTP batas tanah sebelah utara\nSurat sporadik belum ttd kades"
+                }
                 value={docs}
                 onChange={(e) => setDocs(e.target.value)}
                 className={inputCls}
               />
               <p className="mt-1 text-xs text-gray-500">
-                Kosongkan jika dokumen sudah lengkap; berkas akan kembali ke status verifikasi petugas.
+                Kosongkan jika dokumen sudah lengkap; berkas akan kembali ke
+                status verifikasi petugas.
               </p>
             </div>
             <FormFooter
@@ -1390,7 +1862,10 @@ export default function AdminTable({
               Tandai Selesai - {dialog.row.ticketNumber}
             </h2>
             <div>
-              <label htmlFor="official" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="official"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Nomor Berkas Resmi BPN
               </label>
               <input
@@ -1402,7 +1877,8 @@ export default function AdminTable({
                 className={inputCls}
               />
               <p className="mt-1 text-xs text-gray-500">
-                Nomor dari aplikasi Sentuh Tanahku. Akan ditampilkan kepada pemohon.
+                Nomor dari aplikasi Sentuh Tanahku. Akan ditampilkan kepada
+                pemohon.
               </p>
             </div>
             <FormFooter
@@ -1412,6 +1888,159 @@ export default function AdminTable({
               onCancel={close}
             />
           </form>
+        </Modal>
+      )}
+
+      {/* Modal: Kelola Petugas Lapangan */}
+      {dialog?.kind === "officers" && (
+        <Modal titleId="officers-title" maxWidth="max-w-xl">
+          <div className="space-y-4">
+            <div className="border-b border-gray-200 pb-3">
+              <div className="flex items-center justify-between">
+                <h2
+                  id="officers-title"
+                  className="text-lg font-bold text-gray-900"
+                >
+                  Kelola Tim Petugas Lapangan
+                </h2>
+                <button
+                  type="button"
+                  onClick={close}
+                  className="rounded-lg p-1 text-gray-400 hover:text-gray-600 transition"
+                  aria-label="Tutup"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="mt-0.5 text-xs text-gray-600">
+                Daftar petugas ukur &amp; verifikasi lapangan ATR/BPN yang dapat
+                ditugaskan pada berkas.
+              </p>
+            </div>
+
+            {officerError && (
+              <div
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700"
+              >
+                {officerError}
+              </div>
+            )}
+
+            {/* Form Tambah Petugas Baru */}
+            <form
+              onSubmit={handleAddOfficer}
+              className="rounded-xl border border-gray-200 bg-slate-50 p-3.5 space-y-2.5"
+            >
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                + Tambah Petugas Baru
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label
+                    htmlFor="newOfficerName"
+                    className="block text-xs font-medium text-gray-600"
+                  >
+                    Nama Petugas &amp; Gelar
+                  </label>
+                  <input
+                    id="newOfficerName"
+                    type="text"
+                    required
+                    placeholder="Contoh: Budi Santoso, S.T."
+                    value={officerNameInput}
+                    onChange={(e) => setOfficerNameInput(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-2 focus:ring-[#002B49]/20 outline-none transition"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="newOfficerPosition"
+                    className="block text-xs font-medium text-gray-600"
+                  >
+                    Jabatan / Seksi
+                  </label>
+                  <input
+                    id="newOfficerPosition"
+                    type="text"
+                    required
+                    placeholder="Contoh: Petugas Ukur Seksi Survei & Pemetaan"
+                    value={officerPositionInput}
+                    onChange={(e) => setOfficerPositionInput(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-2 focus:ring-[#002B49]/20 outline-none transition"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  disabled={officerPending}
+                  className="rounded-lg bg-[#002B49] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#003d66] disabled:opacity-60 transition"
+                >
+                  {officerPending ? "Menyimpan..." : "+ Tambah Petugas"}
+                </button>
+              </div>
+            </form>
+
+            {/* Daftar Petugas */}
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-700">
+                Daftar Petugas Aktif ({officerList.length})
+              </p>
+              {officerList.length === 0 ? (
+                <p className="py-4 text-center text-xs text-gray-500">
+                  Belum ada data petugas.
+                </p>
+              ) : (
+                <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                  {officerList.map((o) => (
+                    <div
+                      key={o.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-xs"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-gray-900">{o.name}</div>
+                        <div className="text-[11px] text-gray-500">
+                          {o.position}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={officerPending}
+                        onClick={() => handleDeleteOfficer(o.id)}
+                        title={`Hapus ${o.name}`}
+                        className="rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-600 hover:bg-red-100 disabled:opacity-50 transition"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end border-t border-gray-200 pt-3">
+              <button
+                type="button"
+                onClick={close}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
     </>

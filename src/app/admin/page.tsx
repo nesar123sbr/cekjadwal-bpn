@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
 import AdminTable, { type AdminRow } from "@/components/admin/AdminTable";
 import BrandHeader from "@/components/BrandHeader";
+import TopographicBackground from "@/components/TopographicBackground";
 import { db } from "@/db";
 import {
   application_visits,
@@ -75,22 +76,27 @@ export default async function AdminPage() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <BrandHeader />
-      <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex w-full max-w-[1536px] items-center justify-between px-3 sm:px-6 lg:px-8 py-3.5">
-          <h1 className="text-lg font-bold text-[#002B49]">Dashboard TU - CekJadwal BPN</h1>
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="rounded-lg border border-[#002B49] px-3 py-1.5 text-sm text-[#002B49] hover:bg-slate-100 transition"
-            >
-              Keluar (Logout)
-            </button>
-          </form>
+    <div className="relative min-h-screen bg-slate-50">
+      <TopographicBackground />
+      <div className="relative z-10">
+        <BrandHeader />
+        <div className="border-b border-gray-200/90 bg-white/90 backdrop-blur-xs">
+          <div className="mx-auto flex w-full max-w-[1536px] items-center justify-between px-3 sm:px-6 lg:px-8 py-3.5">
+            <h1 className="text-lg font-bold text-[#002B49]">
+              Dashboard TU - CekJadwal BPN
+            </h1>
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="rounded-lg border border-[#002B49] px-3 py-1.5 text-sm text-[#002B49] hover:bg-slate-100 transition"
+              >
+                Keluar (Logout)
+              </button>
+            </form>
+          </div>
         </div>
       </div>
-      <main className="mx-auto w-full max-w-[1536px] px-3 sm:px-6 lg:px-8 py-6">
+      <main className="relative z-10 mx-auto w-full max-w-[1536px] px-3 sm:px-6 lg:px-8 py-6">
         <AdminTable
           rows={rows}
           officers={officerList.map((o) => ({
