@@ -42,3 +42,30 @@ export function formatIndoTime(timeStr: string): string {
   const formattedHhMm = `${String(hour).padStart(2, "0")}:${minute}`;
   return `${formattedHhMm} WIB (${hourNon24}${minuteSuffix} ${period})`;
 }
+
+/** Mengembalikan tanggal hari ini dalam format YYYY-MM-DD terkunci ke Asia/Jakarta (WIB). */
+export function getTodayWib(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/** Mengembalikan ISO string dengan offset resmi +07:00 terkunci ke Asia/Jakarta (WIB). */
+export function getNowWibIso(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}+07:00`;
+}

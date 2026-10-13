@@ -21,32 +21,37 @@ export const metadata = { title: "Dashboard TU - CekJadwal BPN" };
 export default async function AdminPage() {
   if (!(await getSession())) redirect("/admin/login");
 
-  const [apps, activeSchedules, team, officerList, allVisits] = await Promise.all([
-    db
-      .select()
-      .from(applications)
-      .where(isNull(applications.deleted_at))
-      .orderBy(desc(applications.created_at)),
-    db.select().from(schedules).where(eq(schedules.status, "AKTIF")),
-    db
-      .select({
-        scheduleId: schedule_officers.schedule_id,
-        officerId: officers.id,
-        name: officers.name,
-      })
-      .from(schedule_officers)
-      .innerJoin(officers, eq(schedule_officers.officer_id, officers.id)),
-    db.select().from(officers).orderBy(asc(officers.name)),
-    db
-      .select()
-      .from(application_visits)
-      .orderBy(asc(application_visits.visit_date), asc(application_visits.created_at)),
-  ]);
+  const [apps, activeSchedules, team, officerList, allVisits] =
+    await Promise.all([
+      db
+        .select()
+        .from(applications)
+        .where(isNull(applications.deleted_at))
+        .orderBy(desc(applications.created_at)),
+      db.select().from(schedules).where(eq(schedules.status, "AKTIF")),
+      db
+        .select({
+          scheduleId: schedule_officers.schedule_id,
+          officerId: officers.id,
+          name: officers.name,
+        })
+        .from(schedule_officers)
+        .innerJoin(officers, eq(schedule_officers.officer_id, officers.id)),
+      db.select().from(officers).orderBy(asc(officers.name)),
+      db
+        .select()
+        .from(application_visits)
+        .orderBy(
+          asc(application_visits.visit_date),
+          asc(application_visits.created_at),
+        ),
+    ]);
 
   const rows: AdminRow[] = apps.map((a) => {
     const sch = activeSchedules.find((s) => s.application_id === a.id);
     const appVisits = allVisits.filter((v) => v.application_id === a.id);
-    const firstVisitDate = appVisits[0]?.visit_date ?? a.created_at.slice(0, 10);
+    const firstVisitDate =
+      appVisits[0]?.visit_date ?? a.created_at.slice(0, 10);
 
     return {
       id: a.id,
@@ -83,7 +88,7 @@ export default async function AdminPage() {
         <div className="border-b border-gray-200/90 bg-white/90 backdrop-blur-xs">
           <div className="mx-auto flex w-full max-w-[1536px] items-center justify-between px-3 sm:px-6 lg:px-8 py-3.5">
             <h1 className="text-lg font-bold text-[#002B49]">
-              Dashboard TU - CekJadwal BPN
+              Dashboard TU - CekJadwal Pemeriksaan Tanah BPN
             </h1>
             <form action={logoutAction}>
               <button

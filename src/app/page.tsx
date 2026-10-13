@@ -22,7 +22,9 @@ export default async function Home({
       <BrandHeader />
       <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8 sm:py-12">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-[#002B49] sm:text-3xl">CekJadwal BPN</h1>
+          <h1 className="text-2xl font-bold text-[#002B49] sm:text-3xl">
+            Cek Jadwal Pemeriksaan Tanah Anda
+          </h1>
           <p className="mt-2 text-sm text-gray-600">
             Masukkan nomor tiket dan nama pemohon untuk melihat status berkas
             sebelum nomor berkas resmi terbit.
@@ -35,7 +37,10 @@ export default async function Home({
           initialName={name}
         />
         <footer className="mt-8 text-center">
-          <Link href="/admin" className="text-xs text-gray-400 hover:text-gray-600">
+          <Link
+            href="/admin"
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
             Akses Internal Petugas TU
           </Link>
         </footer>
