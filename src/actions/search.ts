@@ -64,113 +64,118 @@ function splitDocs(raw: string | null): string[] {
 }
 
 export async function searchTicket(input: SearchInput): Promise<SearchResult> {
-  const normalized = normalizeTicketNumber(String(input.ticketNumber ?? ""));
-  const nameQuery = String(input.applicantName ?? "").trim().toLowerCase();
-  if (!normalized || nameQuery.length < MIN_NAME_LENGTH) {
-    return { status: "TIDAK_DITEMUKAN" };
-  }
+  try {
+    const normalized = normalizeTicketNumber(String(input.ticketNumber ?? ""));
+    const nameQuery = String(input.applicantName ?? "").trim().toLowerCase();
+    if (!normalized || nameQuery.length < MIN_NAME_LENGTH) {
+      return { status: "TIDAK_DITEMUKAN" };
+    }
 
-  const matchedApps = await db
-    .select()
-    .from(applications)
-    .where(
-      and(
-        eq(applications.ticket_number_normalized, normalized),
-        isNull(applications.deleted_at),
-      ),
+    const matchedApps = await db
+      .select()
+      .from(applications)
+      .where(
+        and(
+          eq(applications.ticket_number_normalized, normalized),
+          isNull(applications.deleted_at),
+        ),
+      );
+
+    // Nama harus cocok sebagian (case-insensitive) sebagai verifikasi kepemilikan.
+    // Hasil sama dengan "tidak ditemukan" agar nomor tiket tidak bisa ditebak.
+    const validApps = matchedApps.filter((app) =>
+      app.applicant_name.toLowerCase().includes(nameQuery),
     );
 
-  // Nama harus cocok sebagian (case-insensitive) sebagai verifikasi kepemilikan.
-  // Hasil sama dengan "tidak ditemukan" agar nomor tiket tidak bisa ditebak.
-  const validApps = matchedApps.filter((app) =>
-    app.applicant_name.toLowerCase().includes(nameQuery),
-  );
-
-  if (validApps.length === 0) {
-    return { status: "TIDAK_DITEMUKAN" };
-  }
-
-  const appIds = validApps.map((a) => a.id);
-
-  // Ambil riwayat kunjungan untuk semua berkas terkait
-  const allVisits = await db
-    .select({
-      applicationId: application_visits.application_id,
-      visitDate: application_visits.visit_date,
-    })
-    .from(application_visits)
-    .where(inArray(application_visits.application_id, appIds))
-    .orderBy(desc(application_visits.visit_date), desc(application_visits.created_at));
-
-  // Ambil jadwal aktif jika ada
-  const activeSchedules = await db
-    .select()
-    .from(schedules)
-    .where(
-      and(
-        inArray(schedules.application_id, appIds),
-        eq(schedules.status, "AKTIF"),
-      ),
-    );
-
-  const items: SearchResultItem[] = validApps.map((app) => {
-    const stageEnd =
-      app.status === "SELESAI" ? new Date(app.status_updated_at) : new Date();
-    const appVisits = allVisits.filter((v) => v.applicationId === app.id);
-    const lastVisitDate = appVisits[0]?.visitDate ?? null;
-
-    const base: Base = {
-      id: app.id,
-      ticketNumber: app.ticket_number,
-      applicantName: maskName(app.applicant_name),
-      objectAddress: maskAddress(app.object_address),
-      daysInProcess: daysBetween(app.created_at, stageEnd),
-      lastVisitDate,
-    };
-    const daysInStage = daysBetween(app.status_updated_at);
-
-    if (app.status === "SELESAI") {
-      return {
-        ...base,
-        status: "SELESAI",
-        officialFileNumber: app.official_file_number ?? "-",
-      };
+    if (validApps.length === 0) {
+      return { status: "TIDAK_DITEMUKAN" };
     }
 
-    if (app.status === "MENUNGGU_DOKUMEN") {
+    const appIds = validApps.map((a) => a.id);
+
+    // Ambil riwayat kunjungan untuk semua berkas terkait
+    const allVisits = await db
+      .select({
+        applicationId: application_visits.application_id,
+        visitDate: application_visits.visit_date,
+      })
+      .from(application_visits)
+      .where(inArray(application_visits.application_id, appIds))
+      .orderBy(desc(application_visits.visit_date), desc(application_visits.created_at));
+
+    // Ambil jadwal aktif jika ada
+    const activeSchedules = await db
+      .select()
+      .from(schedules)
+      .where(
+        and(
+          inArray(schedules.application_id, appIds),
+          eq(schedules.status, "AKTIF"),
+        ),
+      );
+
+    const items: SearchResultItem[] = validApps.map((app) => {
+      const stageEnd =
+        app.status === "SELESAI" ? new Date(app.status_updated_at) : new Date();
+      const appVisits = allVisits.filter((v) => v.applicationId === app.id);
+      const lastVisitDate = appVisits[0]?.visitDate ?? null;
+
+      const base: Base = {
+        id: app.id,
+        ticketNumber: app.ticket_number,
+        applicantName: maskName(app.applicant_name),
+        objectAddress: maskAddress(app.object_address),
+        daysInProcess: daysBetween(app.created_at, stageEnd),
+        lastVisitDate,
+      };
+      const daysInStage = daysBetween(app.status_updated_at);
+
+      if (app.status === "SELESAI") {
+        return {
+          ...base,
+          status: "SELESAI",
+          officialFileNumber: app.official_file_number ?? "-",
+        };
+      }
+
+      if (app.status === "MENUNGGU_DOKUMEN") {
+        return {
+          ...base,
+          status: "DOKUMEN_KURANG",
+          missingDocuments: splitDocs(app.missing_documents),
+          daysWaiting: daysInStage,
+        };
+      }
+
+      const schedule =
+        app.status === "DIJADWALKAN"
+          ? activeSchedules.find((s) => s.application_id === app.id)
+          : undefined;
+
+      if (!schedule) {
+        return {
+          ...base,
+          status: "MENUNGGU_JADWAL",
+          daysWaiting: daysInStage,
+        };
+      }
+
       return {
         ...base,
-        status: "DOKUMEN_KURANG",
-        missingDocuments: splitDocs(app.missing_documents),
-        daysWaiting: daysInStage,
+        status: "DIJADWALKAN",
+        inspectionDate: schedule.inspection_date,
+        inspectionTime: schedule.inspection_time,
+        notes: schedule.notes_for_public,
+        officers: [],
       };
-    }
-
-    const schedule =
-      app.status === "DIJADWALKAN"
-        ? activeSchedules.find((s) => s.application_id === app.id)
-        : undefined;
-
-    if (!schedule) {
-      return {
-        ...base,
-        status: "MENUNGGU_JADWAL",
-        daysWaiting: daysInStage,
-      };
-    }
+    });
 
     return {
-      ...base,
-      status: "DIJADWALKAN",
-      inspectionDate: schedule.inspection_date,
-      inspectionTime: schedule.inspection_time,
-      notes: schedule.notes_for_public,
-      officers: [],
+      status: "DITEMUKAN",
+      items,
     };
-  });
-
-  return {
-    status: "DITEMUKAN",
-    items,
-  };
+  } catch (err) {
+    console.error("searchTicket error:", err);
+    return { status: "TIDAK_DITEMUKAN" };
+  }
 }
