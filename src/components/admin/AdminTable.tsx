@@ -18,8 +18,11 @@ import {
   type VisitLogItem,
 } from "@/actions/application";
 import {
+  cancelSchedule,
   createSchedule,
   markApplicationComplete,
+  reopenApplication,
+  updateOfficialFileNumber,
   updateSchedule,
 } from "@/actions/schedule";
 import { addOfficer, deleteOfficer } from "@/actions/officer";
@@ -105,8 +108,11 @@ function formatShortDate(dateStr: string): string {
 
 type Dialog =
   | { kind: "schedule"; row: AdminRow; edit: boolean }
+  | { kind: "cancelSchedule"; row: AdminRow }
   | { kind: "docs"; row: AdminRow }
   | { kind: "complete"; row: AdminRow }
+  | { kind: "correction"; row: AdminRow }
+  | { kind: "reopen"; row: AdminRow }
   | { kind: "new" }
   | { kind: "edit"; row: AdminRow }
   | { kind: "delete"; row: AdminRow }
@@ -239,6 +245,10 @@ export default function AdminTable({
   // Form dokumen kurang / nomor resmi
   const [docs, setDocs] = useState("");
   const [officialNumber, setOfficialNumber] = useState("");
+
+  // Form pembatalan jadwal / koreksi nomor resmi
+  const [cancelReason, setCancelReason] = useState("");
+  const [correctionNumber, setCorrectionNumber] = useState("");
 
   // Modal riwayat kunjungan
   const [visitLogs, setVisitLogs] = useState<VisitLogItem[]>([]);
@@ -396,6 +406,23 @@ export default function AdminTable({
     setDialog({ kind: "delete", row });
   }
 
+  function openCancelSchedule(row: AdminRow) {
+    setCancelReason("");
+    setError(null);
+    setDialog({ kind: "cancelSchedule", row });
+  }
+
+  function openCorrection(row: AdminRow) {
+    setCorrectionNumber(row.officialFileNumber ?? "");
+    setError(null);
+    setDialog({ kind: "correction", row });
+  }
+
+  function openReopen(row: AdminRow) {
+    setError(null);
+    setDialog({ kind: "reopen", row });
+  }
+
   async function openHistory(row: AdminRow) {
     setError(null);
     setVisitDateInput(new Date().toISOString().slice(0, 10));
@@ -528,6 +555,36 @@ export default function AdminTable({
     }
     setError(null);
     run(() => markApplicationComplete(dialog.row.id, officialNumber));
+  }
+
+  function submitCancelSchedule(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (dialog?.kind !== "cancelSchedule") return;
+    if (cancelReason.trim().length < 3) {
+      return setError("Alasan pembatalan minimal 3 karakter.");
+    }
+    setError(null);
+    run(() => cancelSchedule(dialog.row.id, cancelReason.trim()));
+  }
+
+  function submitCorrection(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (dialog?.kind !== "correction") return;
+    if (!correctionNumber.trim()) {
+      return setError("Nomor Berkas Resmi BPN wajib diisi.");
+    }
+    if (correctionNumber.trim().length > 50) {
+      return setError("Nomor Berkas Resmi BPN maksimal 50 karakter.");
+    }
+    setError(null);
+    run(() => updateOfficialFileNumber(dialog.row.id, correctionNumber.trim()));
+  }
+
+  function submitReopen(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (dialog?.kind !== "reopen") return;
+    setError(null);
+    run(() => reopenApplication(dialog.row.id));
   }
 
   async function submitAddVisit(e: FormEvent<HTMLFormElement>) {
@@ -1472,29 +1529,105 @@ export default function AdminTable({
                             )}
 
                             {r.status === "DIJADWALKAN" && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenActionMenuId(null);
-                                  openSchedule(r, true);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-blue-700 hover:bg-blue-50 transition"
-                              >
-                                <svg
-                                  className="h-3.5 w-3.5 text-blue-600 shrink-0"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    openSchedule(r, true);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-blue-700 hover:bg-blue-50 transition"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                  />
-                                </svg>
-                                <span>Ubah Jadwal Pemeriksaan</span>
-                              </button>
+                                  <svg
+                                    className="h-3.5 w-3.5 text-blue-600 shrink-0"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                    />
+                                  </svg>
+                                  <span>Ubah Jadwal Pemeriksaan</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    openCancelSchedule(r);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-rose-700 hover:bg-rose-50 transition"
+                                >
+                                  <svg
+                                    className="h-3.5 w-3.5 text-rose-600 shrink-0"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                  <span>Batalkan Jadwal Pemeriksaan</span>
+                                </button>
+                              </>
+                            )}
+
+                            {r.status === "SELESAI" && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    openCorrection(r);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-blue-700 hover:bg-blue-50 transition"
+                                >
+                                  <svg
+                                    className="h-3.5 w-3.5 text-blue-600 shrink-0"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                    />
+                                  </svg>
+                                  <span>Koreksi Nomor Berkas Resmi</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    openReopen(r);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-amber-700 hover:bg-amber-50 transition"
+                                >
+                                  <svg
+                                    className="h-3.5 w-3.5 text-amber-600 shrink-0"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                    />
+                                  </svg>
+                                  <span>Buka Kembali Berkas</span>
+                                </button>
+                              </>
                             )}
                           </div>
 
@@ -2127,6 +2260,148 @@ export default function AdminTable({
         </Modal>
       )}
 
+      {/* Modal: Batalkan Jadwal Pemeriksaan */}
+      {dialog?.kind === "cancelSchedule" && (
+        <Modal titleId="cancel-schedule-title">
+          <form onSubmit={submitCancelSchedule} className="space-y-4">
+            <div className="border-b border-gray-200 pb-3">
+              <h2
+                id="cancel-schedule-title"
+                className="text-lg font-bold text-gray-900"
+              >
+                Batalkan Jadwal - {dialog.row.ticketNumber}
+              </h2>
+              <p className="mt-1 text-xs text-gray-600">
+                Jadwal pemeriksaan aktif akan dibatalkan dan status berkas dikembalikan ke{" "}
+                <strong>Verifikasi Petugas</strong>.
+              </p>
+            </div>
+            <div>
+              <label
+                htmlFor="cancel-reason"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Alasan Pembatalan <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="cancel-reason"
+                rows={3}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Contoh: Pemohon berhalangan hadir / Perlu revisi patok batas"
+                className={inputCls}
+                required
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Minimal 3 karakter. Alasan pembatalan ini akan dicatat ke dalam riwayat sistem.
+              </p>
+            </div>
+            <FormFooter
+              error={error}
+              pending={pending}
+              disabled={pending || cancelReason.trim().length < 3}
+              submitLabel="Batalkan Jadwal"
+              onCancel={close}
+            />
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal: Koreksi Nomor Berkas Resmi */}
+      {dialog?.kind === "correction" && (
+        <Modal titleId="correction-title">
+          <form onSubmit={submitCorrection} className="space-y-4">
+            <div className="border-b border-gray-200 pb-3">
+              <h2
+                id="correction-title"
+                className="text-lg font-bold text-gray-900"
+              >
+                Koreksi Nomor Berkas Resmi - {dialog.row.ticketNumber}
+              </h2>
+              <p className="mt-1 text-xs text-gray-600">
+                Perbarui nomor berkas resmi BPN Sentuh Tanahku tanpa mengubah status atau tanggal penyelesaian berkas.
+              </p>
+            </div>
+            <div>
+              <label
+                htmlFor="correction-official"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Nomor Berkas Resmi BPN Baru <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="correction-official"
+                type="text"
+                maxLength={50}
+                placeholder="Contoh: 1201/2026"
+                value={correctionNumber}
+                onChange={(e) => setCorrectionNumber(e.target.value)}
+                className={inputCls}
+                required
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Maksimal 50 karakter. Nomor ini akan tampil saat pemohon melakukan pengecekan mandiri.
+              </p>
+            </div>
+            <FormFooter
+              error={error}
+              pending={pending}
+              disabled={
+                pending ||
+                !correctionNumber.trim() ||
+                correctionNumber.trim().length > 50
+              }
+              submitLabel="Simpan Perubahan"
+              onCancel={close}
+            />
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal: Buka Kembali Berkas */}
+      {dialog?.kind === "reopen" && (
+        <Modal titleId="reopen-title">
+          <form onSubmit={submitReopen} className="space-y-4">
+            <div className="border-b border-gray-200 pb-3">
+              <h2
+                id="reopen-title"
+                className="text-lg font-bold text-gray-900"
+              >
+                Buka Kembali Berkas - {dialog.row.ticketNumber}
+              </h2>
+              <p className="mt-1 text-xs text-gray-600">
+                Pemohon: <strong>{dialog.row.applicantName}</strong>
+              </p>
+            </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 space-y-1.5">
+              <p className="font-semibold text-sm text-amber-950">
+                Konfirmasi Pembukaan Kembali Berkas
+              </p>
+              <p>
+                Tindakan ini akan mengembalikan berkas ke proses aktif:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-amber-900">
+                <li>
+                  Berkas akan kembali ke status <strong>Dijadwalkan</strong> (atau <strong>Verifikasi Petugas</strong> jika tidak ada riwayat jadwal).
+                </li>
+                <li>
+                  Jadwal pemeriksaan lapangan terakhir akan diaktifkan kembali.
+                </li>
+                <li>
+                  Nomor berkas resmi sebelumnya akan dikosongkan.
+                </li>
+              </ul>
+            </div>
+            <FormFooter
+              error={error}
+              pending={pending}
+              submitLabel="Ya, Buka Kembali Berkas"
+              onCancel={close}
+            />
+          </form>
+        </Modal>
+      )}
+
       {/* Modal: Kelola Petugas Lapangan */}
       {dialog?.kind === "officers" && (
         <Modal titleId="officers-title" maxWidth="max-w-xl">
@@ -2313,12 +2588,15 @@ function FormFooter({
   pending,
   submitLabel,
   onCancel,
+  disabled,
 }: {
   error: string | null;
   pending: boolean;
   submitLabel: string;
   onCancel: () => void;
+  disabled?: boolean;
 }) {
+  const isSubmitDisabled = disabled !== undefined ? disabled : pending;
   return (
     <>
       {error && (
@@ -2337,7 +2615,7 @@ function FormFooter({
         </button>
         <button
           type="submit"
-          disabled={pending}
+          disabled={isSubmitDisabled}
           className="rounded-xl bg-[#002B49] px-4 py-2 text-sm font-semibold text-white hover:bg-[#003d66] disabled:opacity-60 transition shadow-xs"
         >
           {pending ? "Menyimpan..." : submitLabel}

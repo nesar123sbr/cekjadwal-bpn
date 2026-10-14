@@ -25,6 +25,19 @@ type SeedApp = {
 };
 
 async function seed() {
+  const isVercel = Boolean(process.env.VERCEL);
+  const isProd = process.env.NODE_ENV === "production";
+  const tursoUrl = process.env.TURSO_DATABASE_URL;
+  const isRemoteTurso = Boolean(tursoUrl && !tursoUrl.startsWith("file:"));
+  const allowSeed = process.env.ALLOW_SEED === "true";
+
+  if (isVercel || isProd || (isRemoteTurso && !allowSeed)) {
+    console.error(
+      "Operasi seed dibatalkan: Database terdeteksi berada di environment produksi atau remote Turso. Atur ALLOW_SEED=true secara eksplisit jika memang ingin menjalankan seed.",
+    );
+    process.exit(1);
+  }
+
   // Reset (urutan child -> parent) agar seed idempotent.
   await db.delete(application_visits);
   await db.delete(schedule_officers);

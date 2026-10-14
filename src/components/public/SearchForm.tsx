@@ -47,7 +47,9 @@ export default function SearchForm({ onResult, initialTicket, initialName }: Pro
     if (autoRan.current) return;
     autoRan.current = true;
     if (initialTicket?.trim() && initialName?.trim()) {
-      void run(initialTicket, initialName);
+      queueMicrotask(() => {
+        void run(initialTicket, initialName);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -64,7 +64,7 @@ export async function createSchedule(
     const found = await db
       .select({ id: officers.id })
       .from(officers)
-      .where(inArray(officers.id, officerIds));
+      .where(and(inArray(officers.id, officerIds), isNull(officers.deleted_at)));
     if (found.length !== officerIds.length) {
       return { ok: false, error: "Petugas tidak valid." };
     }
@@ -164,7 +164,12 @@ export async function markApplicationComplete(
     const duplicate = await db
       .select({ id: applications.id })
       .from(applications)
-      .where(eq(applications.official_file_number, official))
+      .where(
+        and(
+          eq(applications.official_file_number, official),
+          isNull(applications.deleted_at),
+        ),
+      )
       .get();
     if (duplicate && duplicate.id !== applicationId) {
       return { ok: false, error: "Nomor Berkas Resmi sudah dipakai berkas lain." };
@@ -243,7 +248,7 @@ export async function updateSchedule(
     const found = await db
       .select({ id: officers.id })
       .from(officers)
-      .where(inArray(officers.id, officerIds));
+      .where(and(inArray(officers.id, officerIds), isNull(officers.deleted_at)));
     if (found.length !== officerIds.length) {
       return { ok: false, error: "Petugas tidak valid." };
     }
@@ -305,6 +310,220 @@ export async function updateSchedule(
         err instanceof Error
           ? err.message
           : "Terjadi kesalahan saat memperbarui jadwal pemeriksaan.",
+    };
+  }
+}
+
+export async function cancelSchedule(
+  applicationId: string,
+  reason: string,
+): Promise<ScheduleActionResult> {
+  try {
+    if (!(await getSession())) {
+      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    }
+
+    const cleanReason = reason.trim();
+    if (!cleanReason || cleanReason.length < 3) {
+      return {
+        ok: false,
+        error: "Alasan pembatalan wajib diisi minimal 3 karakter.",
+      };
+    }
+
+    const app = await db
+      .select()
+      .from(applications)
+      .where(
+        and(eq(applications.id, applicationId), isNull(applications.deleted_at)),
+      )
+      .get();
+    if (!app) return { ok: false, error: "Berkas tidak ditemukan." };
+    if (app.status !== "DIJADWALKAN") {
+      return {
+        ok: false,
+        error:
+          "Hanya berkas berstatus Dijadwalkan yang dapat dibatalkan jadwalnya.",
+      };
+    }
+
+    const now = getNowWibIso();
+    await db.transaction(async (tx) => {
+      await tx
+        .update(schedules)
+        .set({
+          status: "DIBATALKAN",
+          cancel_reason: cleanReason,
+        })
+        .where(
+          and(
+            eq(schedules.application_id, applicationId),
+            eq(schedules.status, "AKTIF"),
+          ),
+        );
+
+      await tx
+        .update(applications)
+        .set({
+          status: "VERIFIKASI_PETUGAS",
+          status_updated_at: now,
+        })
+        .where(eq(applications.id, applicationId));
+    });
+
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (err) {
+    console.error("cancelSchedule error:", err);
+    return {
+      ok: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat membatalkan jadwal pemeriksaan.",
+    };
+  }
+}
+
+export async function updateOfficialFileNumber(
+  applicationId: string,
+  newNumber: string,
+): Promise<ScheduleActionResult> {
+  try {
+    if (!(await getSession())) {
+      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    }
+
+    const official = newNumber.trim();
+    if (!official) {
+      return { ok: false, error: "Nomor Berkas Resmi BPN wajib diisi." };
+    }
+    if (official.length > 50) {
+      return { ok: false, error: "Nomor Berkas Resmi maksimal 50 karakter." };
+    }
+
+    const app = await db
+      .select()
+      .from(applications)
+      .where(
+        and(eq(applications.id, applicationId), isNull(applications.deleted_at)),
+      )
+      .get();
+    if (!app) return { ok: false, error: "Berkas tidak ditemukan." };
+    if (app.status !== "SELESAI") {
+      return {
+        ok: false,
+        error:
+          "Hanya berkas berstatus Selesai yang dapat diubah nomor berkas resminya.",
+      };
+    }
+
+    const duplicate = await db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(
+        and(
+          eq(applications.official_file_number, official),
+          isNull(applications.deleted_at),
+        ),
+      )
+      .get();
+    if (duplicate && duplicate.id !== applicationId) {
+      return { ok: false, error: "Nomor Berkas Resmi sudah dipakai berkas lain." };
+    }
+
+    await db
+      .update(applications)
+      .set({ official_file_number: official })
+      .where(eq(applications.id, applicationId));
+
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (err) {
+    console.error("updateOfficialFileNumber error:", err);
+    return {
+      ok: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat memperbarui nomor berkas resmi.",
+    };
+  }
+}
+
+export async function reopenApplication(
+  applicationId: string,
+): Promise<ScheduleActionResult> {
+  try {
+    if (!(await getSession())) {
+      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    }
+
+    const app = await db
+      .select()
+      .from(applications)
+      .where(
+        and(eq(applications.id, applicationId), isNull(applications.deleted_at)),
+      )
+      .get();
+    if (!app) return { ok: false, error: "Berkas tidak ditemukan." };
+    if (app.status !== "SELESAI") {
+      return {
+        ok: false,
+        error: "Hanya berkas berstatus Selesai yang dapat dibuka kembali.",
+      };
+    }
+
+    const latestFinishedSchedule = await db
+      .select()
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.application_id, applicationId),
+          eq(schedules.status, "SELESAI"),
+        ),
+      )
+      .orderBy(desc(schedules.inspection_date), desc(schedules.inspection_time))
+      .get();
+
+    const now = getNowWibIso();
+    await db.transaction(async (tx) => {
+      if (latestFinishedSchedule) {
+        await tx
+          .update(schedules)
+          .set({ status: "AKTIF" })
+          .where(eq(schedules.id, latestFinishedSchedule.id));
+
+        await tx
+          .update(applications)
+          .set({
+            status: "DIJADWALKAN",
+            official_file_number: null,
+            status_updated_at: now,
+          })
+          .where(eq(applications.id, applicationId));
+      } else {
+        await tx
+          .update(applications)
+          .set({
+            status: "VERIFIKASI_PETUGAS",
+            official_file_number: null,
+            status_updated_at: now,
+          })
+          .where(eq(applications.id, applicationId));
+      }
+    });
+
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (err) {
+    console.error("reopenApplication error:", err);
+    return {
+      ok: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat membuka kembali berkas.",
     };
   }
 }

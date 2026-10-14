@@ -7,7 +7,7 @@ import {
   applications,
   schedules,
 } from "@/db/schema";
-import { daysBetween, normalizeTicketNumber } from "@/lib/utils";
+import { daysBetween, normalizeName, normalizeTicketNumber } from "@/lib/utils";
 import { maskAddress, maskName } from "@/lib/masking";
 
 type Base = {
@@ -66,8 +66,8 @@ function splitDocs(raw: string | null): string[] {
 export async function searchTicket(input: SearchInput): Promise<SearchResult> {
   try {
     const normalized = normalizeTicketNumber(String(input.ticketNumber ?? ""));
-    const nameQuery = String(input.applicantName ?? "").trim().toLowerCase();
-    if (!normalized || nameQuery.length < MIN_NAME_LENGTH) {
+    const normalizedInputName = normalizeName(String(input.applicantName ?? ""));
+    if (!normalized || normalizedInputName.length < MIN_NAME_LENGTH) {
       return { status: "TIDAK_DITEMUKAN" };
     }
 
@@ -81,10 +81,10 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
         ),
       );
 
-    // Nama harus cocok sebagian (case-insensitive) sebagai verifikasi kepemilikan.
+    // Nama harus cocok utuh setelah dinormalisasi sebagai verifikasi kepemilikan.
     // Hasil sama dengan "tidak ditemukan" agar nomor tiket tidak bisa ditebak.
-    const validApps = matchedApps.filter((app) =>
-      app.applicant_name.toLowerCase().includes(nameQuery),
+    const validApps = matchedApps.filter(
+      (app) => normalizeName(app.applicant_name) === normalizedInputName,
     );
 
     if (validApps.length === 0) {

@@ -44,6 +44,7 @@ export const officers = sqliteTable("officers", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   position: text("position").notNull(),
+  deleted_at: text("deleted_at"),
 });
 
 export const schedules = sqliteTable("schedules", {
@@ -55,6 +56,7 @@ export const schedules = sqliteTable("schedules", {
   inspection_time: text("inspection_time").notNull(),
   status: text("status").notNull().default("AKTIF"),
   notes_for_public: text("notes_for_public"),
+  cancel_reason: text("cancel_reason"),
 });
 
 export const schedule_officers = sqliteTable("schedule_officers", {

@@ -37,7 +37,11 @@ export default async function AdminPage() {
         })
         .from(schedule_officers)
         .innerJoin(officers, eq(schedule_officers.officer_id, officers.id)),
-      db.select().from(officers).orderBy(asc(officers.name)),
+      db
+        .select()
+        .from(officers)
+        .where(isNull(officers.deleted_at))
+        .orderBy(asc(officers.name)),
       db
         .select()
         .from(application_visits)

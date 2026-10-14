@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { applications, officers, schedule_officers, schedules } from "@/db/schema";
 import { getSession } from "@/lib/session";
+import { getNowWibIso } from "@/lib/utils";
 
 export type OfficerItem = {
   id: string;
@@ -73,6 +74,19 @@ export async function deleteOfficer(
       return { ok: false, error: "ID petugas tidak valid." };
     }
 
+    const officer = await db
+      .select({ id: officers.id, deletedAt: officers.deleted_at })
+      .from(officers)
+      .where(eq(officers.id, id))
+      .get();
+
+    if (!officer) {
+      return { ok: false, error: "Petugas tidak ditemukan." };
+    }
+    if (officer.deletedAt) {
+      return { ok: false, error: "Petugas sudah dinonaktifkan." };
+    }
+
     // Cek apakah petugas sedang bertugas di jadwal aktif
     const activeAssignment = await db
       .select({ id: schedule_officers.id })
@@ -92,15 +106,11 @@ export async function deleteOfficer(
       return { ok: false, error: "Petugas masih ditugaskan pada jadwal aktif." };
     }
 
-    // Hapus dari schedule_officers (jadwal non-aktif/selesai) dan officers
-    await db.transaction(async (tx) => {
-      await tx
-        .delete(schedule_officers)
-        .where(eq(schedule_officers.officer_id, id));
-      await tx
-        .delete(officers)
-        .where(eq(officers.id, id));
-    });
+    // Soft delete petugas tanpa menghapus riwayat schedule_officers
+    await db
+      .update(officers)
+      .set({ deleted_at: getNowWibIso() })
+      .where(eq(officers.id, id));
 
     revalidatePath("/admin");
     return { ok: true };

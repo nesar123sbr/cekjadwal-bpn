@@ -1,5 +1,5 @@
 import type { SearchResult, SearchResultItem } from "@/actions/search";
-import { formatIndoTime } from "@/lib/utils";
+import { formatIndoTime, getTodayWib } from "@/lib/utils";
 
 function formatDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -98,9 +98,33 @@ function ResultCard({ item }: { item: SearchResultItem }) {
   }
 
   if (item.status === "DIJADWALKAN") {
+    const isPast = item.inspectionDate < getTodayWib();
+
     return (
       <section role="status" className="w-full rounded-2xl border border-green-200 bg-green-50 p-5">
         <h2 className="text-lg font-semibold text-green-800">Jadwal pemeriksaan ditetapkan</h2>
+        {isPast && (
+          <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-sm text-amber-900 flex items-start gap-2.5">
+            <svg
+              className="h-5 w-5 text-amber-600 shrink-0 mt-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <p>
+              Tanggal pemeriksaan yang tercantum sudah lewat. Petugas sedang
+              memperbarui status berkas Anda. Jika belum ada kabar, silakan
+              hubungi loket pelayanan.
+            </p>
+          </div>
+        )}
         <dl className="mt-4 space-y-3">
           <Row label="Nomor Tiket">{item.ticketNumber}</Row>
           <Row label="Pemohon">{item.applicantName}</Row>

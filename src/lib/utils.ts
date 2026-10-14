@@ -6,6 +6,18 @@ export function normalizeTicketNumber(input: string): string {
   return input.toLowerCase().replace(/[\s\-\u2013\u2014/\\]+/g, "");
 }
 
+/**
+ * Normalisasi nama pemohon: lowercase, hapus tanda baca/simbol, satukan spasi ganda/beruntun menjadi spasi tunggal, lalu trim.
+ * Contoh: "Dr. H. Ahmad Fauzi, S.H." -> "dr h ahmad fauzi sh"
+ */
+export function normalizeName(input: string): string {
+  return (input ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Hitung selisih hari penuh antara dua waktu ISO (minimal 0). */
 export function daysBetween(fromIso: string, to: Date = new Date()): number {
   const from = new Date(fromIso).getTime();
@@ -63,7 +75,7 @@ export function getNowWibIso(): string {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
   }).formatToParts(new Date());
 
   const get = (type: string) => parts.find((p) => p.type === type)?.value || "00";
