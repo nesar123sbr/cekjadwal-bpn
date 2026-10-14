@@ -18,6 +18,57 @@ export function normalizeName(input: string): string {
     .trim();
 }
 
+const TITLE_SET = new Set([
+  "dr",
+  "drg",
+  "drs",
+  "dra",
+  "ir",
+  "prof",
+  "h",
+  "hj",
+  "kh",
+  "sh",
+  "mh",
+  "mkn",
+  "se",
+  "mm",
+  "ak",
+  "st",
+  "mt",
+  "ssi",
+  "msc",
+  "phd",
+  "skom",
+  "mkom",
+  "spd",
+  "mpd",
+  "sip",
+  "msi",
+  "ssos",
+  "sag",
+  "skm",
+  "mkes",
+  "skep",
+  "ners",
+  "amd",
+]);
+
+/**
+ * Normalisasi nama pemohon dengan membuang gelar akademik / keagamaan umum.
+ * Jika hasil penghapusan gelar kosong, mengembalikan hasil normalizeName awal.
+ */
+export function normalizeNameForMatch(input: string): string {
+  const normalized = normalizeName(input);
+  if (!normalized) return "";
+
+  const words = normalized.split(" ").filter(Boolean);
+  const filteredWords = words.filter((w) => !TITLE_SET.has(w));
+
+  const result = filteredWords.join(" ").trim();
+  return result || normalized;
+}
+
 /** Hitung selisih hari penuh antara dua waktu ISO (minimal 0). */
 export function daysBetween(fromIso: string, to: Date = new Date()): number {
   const from = new Date(fromIso).getTime();

@@ -27,6 +27,7 @@ import {
 } from "@/actions/schedule";
 import { addOfficer, deleteOfficer } from "@/actions/officer";
 import type { ApplicationStatus } from "@/db/schema";
+import { getTodayWib } from "@/lib/utils";
 import ReceiptModal from "./ReceiptModal";
 
 export type AdminRow = {
@@ -46,6 +47,7 @@ export type AdminRow = {
   notes: string | null;
   officerIds: string[];
   officerNames: string[];
+  lastCancelReason: string | null;
 };
 
 export type OfficerOption = { id: string; name: string; position: string };
@@ -77,21 +79,23 @@ function checkScheduleUrgency(
   timeStr: string | null,
 ): ScheduleUrgency {
   if (!dateStr) return "NONE";
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayStr = getTodayWib();
 
-  // Cek apakah tanggal sudah lewat hari
+  // Cek apakah tanggal sudah lewat hari (WIB)
   if (dateStr < todayStr) return "OVERDUE";
 
-  // Cek jika tanggal hari ini
+  // Cek jika tanggal hari ini (WIB)
   if (dateStr === todayStr) {
     if (!timeStr) return "TODAY";
     const [hour, minute] = timeStr.split(":").map(Number);
     if (!Number.isNaN(hour) && !Number.isNaN(minute)) {
-      const schedDate = new Date();
+      const nowWib = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }),
+      );
+      const schedDate = new Date(nowWib);
       schedDate.setHours(hour, minute, 0, 0);
       // Jika jam sudah lewat hari ini
-      if (schedDate < now) return "OVERDUE";
+      if (schedDate < nowWib) return "OVERDUE";
     }
     return "TODAY";
   }
@@ -1257,9 +1261,19 @@ export default function AdminTable({
                         </p>
                       )}
                       {r.status === "VERIFIKASI_PETUGAS" && (
-                        <p className="text-[11px] font-medium text-amber-600">
-                          Antrean petugas · {r.daysInStage} hari
-                        </p>
+                        <>
+                          <p className="text-[11px] font-medium text-amber-600">
+                            Antrean petugas · {r.daysInStage} hari
+                          </p>
+                          {r.lastCancelReason && (
+                            <p
+                              title={r.lastCancelReason}
+                              className="mt-0.5 line-clamp-2 text-[11px] text-amber-700/80"
+                            >
+                              Jadwal sebelumnya dibatalkan: {r.lastCancelReason}
+                            </p>
+                          )}
+                        </>
                       )}
                       {r.status === "SELESAI" && r.officialFileNumber && (
                         <p className="text-[11px] font-medium text-emerald-700">
@@ -2382,10 +2396,10 @@ export default function AdminTable({
               </p>
               <ul className="list-disc pl-4 space-y-1 text-amber-900">
                 <li>
-                  Berkas akan kembali ke status <strong>Dijadwalkan</strong> (atau <strong>Verifikasi Petugas</strong> jika tidak ada riwayat jadwal).
+                  Berkas akan kembali ke status <strong>Dijadwalkan</strong> jika jadwal dan seluruh petugasnya masih aktif.
                 </li>
                 <li>
-                  Jadwal pemeriksaan lapangan terakhir akan diaktifkan kembali.
+                  Bila jadwal lama tidak dapat dipulihkan (petugas nonaktif atau jadwal tidak ada), berkas kembali ke antrean <strong>Verifikasi Petugas</strong> dan perlu dijadwalkan ulang.
                 </li>
                 <li>
                   Nomor berkas resmi sebelumnya akan dikosongkan.

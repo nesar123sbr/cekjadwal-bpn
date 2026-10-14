@@ -127,15 +127,25 @@ export async function createSchedule(
     console.error("createSchedule error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat membuat jadwal pemeriksaan.",
+      error: "Terjadi kendala saat menetapkan jadwal pemeriksaan. Silakan coba lagi.",
     };
   }
 }
 
 export type ScheduleActionResult = { ok: true } | { ok: false; error: string };
+
+function validateOfficialFileNumber(
+  raw: string,
+): { ok: true; value: string } | { ok: false; error: string } {
+  const clean = (raw ?? "").trim();
+  if (!clean) {
+    return { ok: false, error: "Nomor Berkas Resmi BPN wajib diisi." };
+  }
+  if (clean.length > 50) {
+    return { ok: false, error: "Nomor Berkas Resmi BPN maksimal 50 karakter." };
+  }
+  return { ok: true, value: clean };
+}
 
 export async function markApplicationComplete(
   applicationId: string,
@@ -156,10 +166,11 @@ export async function markApplicationComplete(
       return { ok: false, error: "Hanya berkas terjadwal yang dapat diselesaikan." };
     }
 
-    const official = officialFileNumber.trim();
-    if (!official) {
-      return { ok: false, error: "Nomor Berkas Resmi BPN wajib diisi." };
+    const valResult = validateOfficialFileNumber(officialFileNumber);
+    if (!valResult.ok) {
+      return { ok: false, error: valResult.error };
     }
+    const official = valResult.value;
 
     const duplicate = await db
       .select({ id: applications.id })
@@ -202,10 +213,7 @@ export async function markApplicationComplete(
     console.error("markApplicationComplete error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat menyelesaikan berkas.",
+      error: "Terjadi kendala saat menyelesaikan berkas. Silakan coba lagi.",
     };
   }
 }
@@ -306,10 +314,7 @@ export async function updateSchedule(
     console.error("updateSchedule error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat memperbarui jadwal pemeriksaan.",
+      error: "Terjadi kendala saat mengubah jadwal pemeriksaan. Silakan coba lagi.",
     };
   }
 }
@@ -377,10 +382,7 @@ export async function cancelSchedule(
     console.error("cancelSchedule error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat membatalkan jadwal pemeriksaan.",
+      error: "Terjadi kendala saat membatalkan jadwal pemeriksaan. Silakan coba lagi.",
     };
   }
 }
@@ -394,13 +396,11 @@ export async function updateOfficialFileNumber(
       return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
     }
 
-    const official = newNumber.trim();
-    if (!official) {
-      return { ok: false, error: "Nomor Berkas Resmi BPN wajib diisi." };
+    const valResult = validateOfficialFileNumber(newNumber);
+    if (!valResult.ok) {
+      return { ok: false, error: valResult.error };
     }
-    if (official.length > 50) {
-      return { ok: false, error: "Nomor Berkas Resmi maksimal 50 karakter." };
-    }
+    const official = valResult.value;
 
     const app = await db
       .select()
@@ -443,10 +443,7 @@ export async function updateOfficialFileNumber(
     console.error("updateOfficialFileNumber error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat memperbarui nomor berkas resmi.",
+      error: "Terjadi kendala saat mengoreksi nomor berkas resmi. Silakan coba lagi.",
     };
   }
 }
@@ -486,9 +483,24 @@ export async function reopenApplication(
       .orderBy(desc(schedules.inspection_date), desc(schedules.inspection_time))
       .get();
 
+    let canRestoreSchedule = false;
+    if (latestFinishedSchedule) {
+      // Periksa apakah petugas pada jadwal ini masih aktif
+      const assignedOfficers = await db
+        .select({
+          deletedAt: officers.deleted_at,
+        })
+        .from(schedule_officers)
+        .innerJoin(officers, eq(schedule_officers.officer_id, officers.id))
+        .where(eq(schedule_officers.schedule_id, latestFinishedSchedule.id));
+
+      const hasInactiveOfficer = assignedOfficers.some((o) => o.deletedAt !== null);
+      canRestoreSchedule = assignedOfficers.length > 0 && !hasInactiveOfficer;
+    }
+
     const now = getNowWibIso();
     await db.transaction(async (tx) => {
-      if (latestFinishedSchedule) {
+      if (latestFinishedSchedule && canRestoreSchedule) {
         await tx
           .update(schedules)
           .set({ status: "AKTIF" })
@@ -520,10 +532,7 @@ export async function reopenApplication(
     console.error("reopenApplication error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat membuka kembali berkas.",
+      error: "Terjadi kendala saat membuka kembali berkas. Silakan coba lagi.",
     };
   }
 }

@@ -103,10 +103,7 @@ export async function createApplication(
     console.error("createApplication error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan sistem saat mendaftarkan berkas.",
+      error: "Terjadi kendala saat mendaftarkan berkas. Silakan coba lagi.",
     };
   }
 }
@@ -154,10 +151,7 @@ export async function updateApplication(
     console.error("updateApplication error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat memperbarui berkas.",
+      error: "Terjadi kendala saat memperbarui data berkas. Silakan coba lagi.",
     };
   }
 }
@@ -201,10 +195,7 @@ export async function deleteApplication(
     console.error("deleteApplication error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat menghapus berkas.",
+      error: "Terjadi kendala saat menghapus berkas. Silakan coba lagi.",
     };
   }
 }
@@ -246,10 +237,7 @@ export async function addVisitLog(
     console.error("addVisitLog error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat menambah log kunjungan.",
+      error: "Terjadi kendala saat mencatat riwayat kedatangan. Silakan coba lagi.",
     };
   }
 }
@@ -279,10 +267,7 @@ export async function getVisitLogs(
     console.error("getVisitLogs error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat memuat log kunjungan.",
+      error: "Terjadi kendala saat memuat riwayat kedatangan. Silakan coba lagi.",
     };
   }
 }
@@ -335,10 +320,7 @@ export async function updateMissingDocs(
     console.error("updateMissingDocs error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat memperbarui catatan dokumen.",
+      error: "Terjadi kendala saat memperbarui catatan dokumen. Silakan coba lagi.",
     };
   }
 }

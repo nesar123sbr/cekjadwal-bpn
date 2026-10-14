@@ -11,9 +11,6 @@ import {
 
 export type LoginState = { error: string | null };
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "adminbpn123";
-
 function safeEqual(a: string, b: string): boolean {
   const ba = Buffer.from(a);
   const bb = Buffer.from(b);
@@ -24,6 +21,23 @@ export async function loginAction(
   _prev: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
+  const isProd = process.env.NODE_ENV === "production";
+  const envAdminUsername = process.env.ADMIN_USERNAME;
+  const envAdminPassword = process.env.ADMIN_PASSWORD;
+  const envSessionSecret = process.env.SESSION_SECRET;
+
+  if (isProd) {
+    if (!envAdminUsername || !envAdminPassword || !envSessionSecret) {
+      console.error(
+        "Konfigurasi kredensial server belum lengkap di environment production.",
+      );
+      return { error: "Konfigurasi kredensial server belum lengkap." };
+    }
+  }
+
+  const expectedUsername = envAdminUsername || "admin";
+  const expectedPassword = envAdminPassword || "adminbpn123";
+
   const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
@@ -31,8 +45,8 @@ export async function loginAction(
     return { error: "Username dan password wajib diisi." };
   }
 
-  const okUser = safeEqual(username, ADMIN_USERNAME);
-  const okPass = safeEqual(password, ADMIN_PASSWORD);
+  const okUser = safeEqual(username, expectedUsername);
+  const okPass = safeEqual(password, expectedPassword);
   if (!okUser || !okPass) {
     return { error: "Username atau password salah." };
   }

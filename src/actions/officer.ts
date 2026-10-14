@@ -54,10 +54,7 @@ export async function addOfficer(
     console.error("addOfficer error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat menambahkan petugas.",
+      error: "Terjadi kendala saat menambahkan petugas. Silakan coba lagi.",
     };
   }
 }
@@ -118,10 +115,7 @@ export async function deleteOfficer(
     console.error("deleteOfficer error:", err);
     return {
       ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat menghapus petugas.",
+      error: "Terjadi kendala saat menonaktifkan petugas. Silakan coba lagi.",
     };
   }
 }

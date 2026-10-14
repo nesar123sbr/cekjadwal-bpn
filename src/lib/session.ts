@@ -6,7 +6,12 @@ export const SESSION_COOKIE = "admin_session";
 export const SESSION_MAX_AGE = 60 * 60 * 8; // 8 jam
 
 function secret(): string {
-  return process.env.SESSION_SECRET || "dev-only-insecure-secret-change-me";
+  const isProd = process.env.NODE_ENV === "production";
+  const s = process.env.SESSION_SECRET;
+  if (isProd && !s) {
+    throw new Error("SESSION_SECRET wajib diatur di environment production.");
+  }
+  return s || "dev-only-insecure-secret-change-me";
 }
 
 function sign(payload: string): string {
@@ -22,15 +27,28 @@ export function createSessionToken(username: string): string {
 
 export function verifySessionToken(token: string | undefined): string | null {
   if (!token) return null;
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  const [username, expStr, sig] = parts;
-  const expected = sign(`${username}.${expStr}`);
-  const a = Buffer.from(sig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  if (Number(expStr) < Math.floor(Date.now() / 1000)) return null;
-  return username;
+  try {
+    const lastDotIndex = token.lastIndexOf(".");
+    if (lastDotIndex === -1) return null;
+
+    const secondLastDotIndex = token.lastIndexOf(".", lastDotIndex - 1);
+    if (secondLastDotIndex === -1) return null;
+
+    const username = token.slice(0, secondLastDotIndex);
+    const expStr = token.slice(secondLastDotIndex + 1, lastDotIndex);
+    const sig = token.slice(lastDotIndex + 1);
+
+    if (!username || !expStr || !sig) return null;
+
+    const expected = sign(`${username}.${expStr}`);
+    const a = Buffer.from(sig);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    if (Number(expStr) < Math.floor(Date.now() / 1000)) return null;
+    return username;
+  } catch {
+    return null;
+  }
 }
 
 /** Mengembalikan username jika sesi valid, selain itu null. */

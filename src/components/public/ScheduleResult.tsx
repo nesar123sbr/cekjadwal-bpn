@@ -88,6 +88,11 @@ function ResultCard({ item }: { item: SearchResultItem }) {
           Dokumen Anda lengkap. Berkas sedang antre verifikasi dan penjadwalan
           oleh petugas. Anda tidak perlu melakukan apa pun.
         </p>
+        {item.previouslyCancelled && (
+          <p className="mt-2 text-xs italic text-amber-800">
+            Jadwal pemeriksaan sebelumnya dibatalkan. Petugas akan menetapkan jadwal baru dan informasinya akan tampil di halaman ini.
+          </p>
+        )}
         {header}
         <Duration
           days={item.daysInProcess}
@@ -181,7 +186,8 @@ export default function ScheduleResult({ result }: Props) {
         <h2 className="text-lg font-semibold text-gray-800">Data tidak ditemukan</h2>
         <p className="mt-1 text-sm text-gray-700">
           Nomor tiket dan nama pemohon tidak cocok dengan data kami. Periksa
-          kembali penulisannya, atau hubungi loket pelayanan.
+          kembali penulisannya, atau hubungi loket pelayanan. Tulis nama pemohon
+          sesuai lembar tanda terima; gelar tidak perlu ditulis.
         </p>
       </section>
     );

@@ -1,4 +1,4 @@
-import { asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
 import AdminTable, { type AdminRow } from "@/components/admin/AdminTable";
@@ -21,7 +21,7 @@ export const metadata = { title: "Dashboard TU - CekJadwal BPN" };
 export default async function AdminPage() {
   if (!(await getSession())) redirect("/admin/login");
 
-  const [apps, activeSchedules, team, officerList, allVisits] =
+  const [apps, activeSchedules, team, officerList, allVisits, cancelledSchedules] =
     await Promise.all([
       db
         .select()
@@ -49,7 +49,30 @@ export default async function AdminPage() {
           asc(application_visits.visit_date),
           asc(application_visits.created_at),
         ),
+      db
+        .select({
+          applicationId: schedules.application_id,
+          cancelReason: schedules.cancel_reason,
+        })
+        .from(schedules)
+        .where(
+          and(
+            eq(schedules.status, "DIBATALKAN"),
+            isNotNull(schedules.cancel_reason),
+          ),
+        )
+        .orderBy(
+          desc(schedules.inspection_date),
+          desc(schedules.inspection_time),
+        ),
     ]);
+
+  const cancelReasonByApp = new Map<string, string>();
+  for (const cs of cancelledSchedules) {
+    if (cs.cancelReason && !cancelReasonByApp.has(cs.applicationId)) {
+      cancelReasonByApp.set(cs.applicationId, cs.cancelReason);
+    }
+  }
 
   const rows: AdminRow[] = apps.map((a) => {
     const sch = activeSchedules.find((s) => s.application_id === a.id);
@@ -81,6 +104,10 @@ export default async function AdminPage() {
       officerNames: sch
         ? team.filter((t) => t.scheduleId === sch.id).map((t) => t.name)
         : [],
+      lastCancelReason:
+        a.status === "VERIFIKASI_PETUGAS"
+          ? (cancelReasonByApp.get(a.id) ?? null)
+          : null,
     };
   });
 

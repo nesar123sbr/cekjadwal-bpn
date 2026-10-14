@@ -1,13 +1,13 @@
 "use server";
 
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
   application_visits,
   applications,
   schedules,
 } from "@/db/schema";
-import { daysBetween, normalizeName, normalizeTicketNumber } from "@/lib/utils";
+import { daysBetween, normalizeNameForMatch, normalizeTicketNumber } from "@/lib/utils";
 import { maskAddress, maskName } from "@/lib/masking";
 
 type Base = {
@@ -32,6 +32,7 @@ export type SearchResultItem =
       status: "MENUNGGU_JADWAL";
       /** Hari berkas menunggu jadwal dari petugas. */
       daysWaiting: number;
+      previouslyCancelled: boolean;
     })
   | (Base & {
       status: "DIJADWALKAN";
@@ -66,7 +67,7 @@ function splitDocs(raw: string | null): string[] {
 export async function searchTicket(input: SearchInput): Promise<SearchResult> {
   try {
     const normalized = normalizeTicketNumber(String(input.ticketNumber ?? ""));
-    const normalizedInputName = normalizeName(String(input.applicantName ?? ""));
+    const normalizedInputName = normalizeNameForMatch(String(input.applicantName ?? ""));
     if (!normalized || normalizedInputName.length < MIN_NAME_LENGTH) {
       return { status: "TIDAK_DITEMUKAN" };
     }
@@ -81,10 +82,10 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
         ),
       );
 
-    // Nama harus cocok utuh setelah dinormalisasi sebagai verifikasi kepemilikan.
+    // Nama harus cocok utuh setelah dinormalisasi (termasuk buang gelar) sebagai verifikasi kepemilikan.
     // Hasil sama dengan "tidak ditemukan" agar nomor tiket tidak bisa ditebak.
     const validApps = matchedApps.filter(
-      (app) => normalizeName(app.applicant_name) === normalizedInputName,
+      (app) => normalizeNameForMatch(app.applicant_name) === normalizedInputName,
     );
 
     if (validApps.length === 0) {
@@ -113,6 +114,19 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
           eq(schedules.status, "AKTIF"),
         ),
       );
+
+    // Ambil riwayat jadwal yang dibatalkan dengan cancel_reason terisi
+    const cancelledSchedules = await db
+      .select({ applicationId: schedules.application_id })
+      .from(schedules)
+      .where(
+        and(
+          inArray(schedules.application_id, appIds),
+          eq(schedules.status, "DIBATALKAN"),
+          isNotNull(schedules.cancel_reason),
+        ),
+      );
+    const cancelledAppIds = new Set(cancelledSchedules.map((s) => s.applicationId));
 
     const items: SearchResultItem[] = validApps.map((app) => {
       const stageEnd =
@@ -157,6 +171,7 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
           ...base,
           status: "MENUNGGU_JADWAL",
           daysWaiting: daysInStage,
+          previouslyCancelled: cancelledAppIds.has(app.id),
         };
       }
 
