@@ -13,7 +13,9 @@ export function normalizeTicketNumber(input: string): string {
 export function normalizeName(input: string): string {
   return (input ?? "")
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\b(dr|drg|drs|dra|ir|prof|h|hj|kh)\./g, "$1 ")
+    .replace(/[.'`’]/g, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -117,7 +119,7 @@ export function getTodayWib(): string {
 }
 
 /** Mengembalikan ISO string dengan offset resmi +07:00 terkunci ke Asia/Jakarta (WIB). */
-export function getNowWibIso(): string {
+export function getNowWibIso(date: Date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
     year: "numeric",
@@ -127,7 +129,7 @@ export function getNowWibIso(): string {
     minute: "2-digit",
     second: "2-digit",
     hourCycle: "h23",
-  }).formatToParts(new Date());
+  }).formatToParts(date);
 
   const get = (type: string) => parts.find((p) => p.type === type)?.value || "00";
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}+07:00`;

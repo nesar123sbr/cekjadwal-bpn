@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { applications, officers, schedule_officers, schedules } from "@/db/schema";
 import { getSession } from "@/lib/session";
-import { getNowWibIso } from "@/lib/utils";
+import { getNowWibIso, normalizeNameForMatch } from "@/lib/utils";
 
 export type OfficerItem = {
   id: string;
@@ -22,13 +22,17 @@ export type DeleteOfficerResult =
   | { ok: true }
   | { ok: false; error: string };
 
+export type ReactivateOfficerResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
 export async function addOfficer(
   name: string,
   position: string,
 ): Promise<AddOfficerResult> {
   try {
     if (!(await getSession())) {
-      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
     const cleanName = name.trim();
@@ -39,6 +43,36 @@ export async function addOfficer(
     }
     if (!cleanPosition) {
       return { ok: false, error: "Jabatan petugas wajib diisi." };
+    }
+
+    const normInput = normalizeNameForMatch(cleanName);
+
+    const allOfficers = await db
+      .select({
+        id: officers.id,
+        name: officers.name,
+        deletedAt: officers.deleted_at,
+      })
+      .from(officers);
+
+    const duplicate = allOfficers.find(
+      (o) => normalizeNameForMatch(o.name) === normInput,
+    );
+
+    if (duplicate) {
+      if (duplicate.deletedAt === null) {
+        return {
+          ok: false,
+          error:
+            "Petugas dengan nama tersebut sudah terdaftar. Jika ini orang yang berbeda, tambahkan pembeda pada nama (mis. inisial atau unit).",
+        };
+      } else {
+        return {
+          ok: false,
+          error:
+            "Petugas dengan nama tersebut ada di daftar nonaktif. Gunakan tombol Aktifkan Kembali.",
+        };
+      }
     }
 
     const newOfficer: OfficerItem = {
@@ -119,3 +153,45 @@ export async function deleteOfficer(
     };
   }
 }
+
+export async function reactivateOfficer(
+  id: string,
+): Promise<ReactivateOfficerResult> {
+  try {
+    if (!(await getSession())) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
+    }
+
+    if (!id) {
+      return { ok: false, error: "ID petugas tidak valid." };
+    }
+
+    const officer = await db
+      .select({ id: officers.id, deletedAt: officers.deleted_at })
+      .from(officers)
+      .where(eq(officers.id, id))
+      .get();
+
+    if (!officer) {
+      return { ok: false, error: "Petugas tidak ditemukan." };
+    }
+    if (!officer.deletedAt) {
+      return { ok: false, error: "Petugas sudah dalam status aktif." };
+    }
+
+    await db
+      .update(officers)
+      .set({ deleted_at: null })
+      .where(eq(officers.id, id));
+
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (err) {
+    console.error("reactivateOfficer error:", err);
+    return {
+      ok: false,
+      error: "Terjadi kendala saat mengaktifkan kembali petugas. Silakan coba lagi.",
+    };
+  }
+}
+

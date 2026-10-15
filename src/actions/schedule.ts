@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
   applications,
+  audit_logs,
   officers,
   schedule_officers,
   schedules,
@@ -324,8 +325,9 @@ export async function cancelSchedule(
   reason: string,
 ): Promise<ScheduleActionResult> {
   try {
-    if (!(await getSession())) {
-      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    const actor = await getSession();
+    if (!actor) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
     const cleanReason = reason.trim();
@@ -352,6 +354,20 @@ export async function cancelSchedule(
       };
     }
 
+    const activeSchedule = await db
+      .select()
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.application_id, applicationId),
+          eq(schedules.status, "AKTIF"),
+        ),
+      )
+      .get();
+    if (!activeSchedule) {
+      return { ok: false, error: "Jadwal aktif tidak ditemukan." };
+    }
+
     const now = getNowWibIso();
     await db.transaction(async (tx) => {
       await tx
@@ -360,12 +376,7 @@ export async function cancelSchedule(
           status: "DIBATALKAN",
           cancel_reason: cleanReason,
         })
-        .where(
-          and(
-            eq(schedules.application_id, applicationId),
-            eq(schedules.status, "AKTIF"),
-          ),
-        );
+        .where(eq(schedules.id, activeSchedule.id));
 
       await tx
         .update(applications)
@@ -374,6 +385,17 @@ export async function cancelSchedule(
           status_updated_at: now,
         })
         .where(eq(applications.id, applicationId));
+
+      await tx.insert(audit_logs).values({
+        id: randomUUID(),
+        application_id: applicationId,
+        action: "CANCEL_SCHEDULE",
+        actor,
+        old_value: `${activeSchedule.inspection_date} ${activeSchedule.inspection_time}`,
+        new_value: cleanReason,
+        ip: null,
+        created_at: now,
+      });
     });
 
     revalidatePath("/admin");
@@ -392,8 +414,9 @@ export async function updateOfficialFileNumber(
   newNumber: string,
 ): Promise<ScheduleActionResult> {
   try {
-    if (!(await getSession())) {
-      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    const actor = await getSession();
+    if (!actor) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
     const valResult = validateOfficialFileNumber(newNumber);
@@ -418,6 +441,11 @@ export async function updateOfficialFileNumber(
       };
     }
 
+    const oldNumber = app.official_file_number;
+    if ((oldNumber ?? "").trim() === official) {
+      return { ok: true };
+    }
+
     const duplicate = await db
       .select({ id: applications.id })
       .from(applications)
@@ -432,10 +460,24 @@ export async function updateOfficialFileNumber(
       return { ok: false, error: "Nomor Berkas Resmi sudah dipakai berkas lain." };
     }
 
-    await db
-      .update(applications)
-      .set({ official_file_number: official })
-      .where(eq(applications.id, applicationId));
+    const now = getNowWibIso();
+    await db.transaction(async (tx) => {
+      await tx
+        .update(applications)
+        .set({ official_file_number: official })
+        .where(eq(applications.id, applicationId));
+
+      await tx.insert(audit_logs).values({
+        id: randomUUID(),
+        application_id: applicationId,
+        action: "UPDATE_OFFICIAL_NUMBER",
+        actor,
+        old_value: oldNumber ?? "-",
+        new_value: official,
+        ip: null,
+        created_at: now,
+      });
+    });
 
     revalidatePath("/admin");
     return { ok: true };
@@ -452,8 +494,9 @@ export async function reopenApplication(
   applicationId: string,
 ): Promise<ScheduleActionResult> {
   try {
-    if (!(await getSession())) {
-      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    const actor = await getSession();
+    if (!actor) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
     const app = await db
@@ -498,9 +541,14 @@ export async function reopenApplication(
       canRestoreSchedule = assignedOfficers.length > 0 && !hasInactiveOfficer;
     }
 
+    const targetStatus =
+      latestFinishedSchedule && canRestoreSchedule
+        ? "DIJADWALKAN"
+        : "VERIFIKASI_PETUGAS";
+
     const now = getNowWibIso();
     await db.transaction(async (tx) => {
-      if (latestFinishedSchedule && canRestoreSchedule) {
+      if (targetStatus === "DIJADWALKAN" && latestFinishedSchedule) {
         await tx
           .update(schedules)
           .set({ status: "AKTIF" })
@@ -524,6 +572,17 @@ export async function reopenApplication(
           })
           .where(eq(applications.id, applicationId));
       }
+
+      await tx.insert(audit_logs).values({
+        id: randomUUID(),
+        application_id: applicationId,
+        action: "REOPEN_APPLICATION",
+        actor,
+        old_value: app.official_file_number ?? "-",
+        new_value: targetStatus,
+        ip: null,
+        created_at: now,
+      });
     });
 
     revalidatePath("/admin");

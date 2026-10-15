@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { application_visits, applications, schedules } from "@/db/schema";
+import { application_visits, applications, audit_logs, schedules } from "@/db/schema";
 import { getSession } from "@/lib/session";
 import { getNowWibIso, getTodayWib, normalizeTicketNumber } from "@/lib/utils";
 
@@ -41,6 +41,17 @@ export type VisitLogItem = {
   applicationId: string;
   visitDate: string;
   notes: string | null;
+  createdAt: string;
+};
+
+export type AuditLogItem = {
+  id: string;
+  applicationId: string | null;
+  action: string;
+  actor: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  ip: string | null;
   createdAt: string;
 };
 
@@ -113,8 +124,9 @@ export async function updateApplication(
   input: UpdateApplicationInput,
 ): Promise<ApplicationActionResult> {
   try {
-    if (!(await getSession())) {
-      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    const actor = await getSession();
+    if (!actor) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
     const ticketNumber = input.ticketNumber.trim();
@@ -128,22 +140,46 @@ export async function updateApplication(
     const normalized = normalizeTicketNumber(ticketNumber);
     if (!normalized) return { ok: false, error: "Nomor tiket tidak valid." };
 
-    const app = await db
-      .select({ id: applications.id })
+    const oldApp = await db
+      .select({
+        id: applications.id,
+        ticket_number: applications.ticket_number,
+        applicant_name: applications.applicant_name,
+      })
       .from(applications)
       .where(and(eq(applications.id, id), isNull(applications.deleted_at)))
       .get();
-    if (!app) return { ok: false, error: "Berkas tidak ditemukan." };
+    if (!oldApp) return { ok: false, error: "Berkas tidak ditemukan." };
 
-    await db
-      .update(applications)
-      .set({
-        ticket_number: ticketNumber,
-        ticket_number_normalized: normalized,
-        applicant_name: applicantName,
-        object_address: objectAddress,
-      })
-      .where(eq(applications.id, id));
+    const isChanged =
+      oldApp.ticket_number !== ticketNumber ||
+      oldApp.applicant_name !== applicantName;
+
+    const now = getNowWibIso();
+    await db.transaction(async (tx) => {
+      await tx
+        .update(applications)
+        .set({
+          ticket_number: ticketNumber,
+          ticket_number_normalized: normalized,
+          applicant_name: applicantName,
+          object_address: objectAddress,
+        })
+        .where(eq(applications.id, id));
+
+      if (isChanged) {
+        await tx.insert(audit_logs).values({
+          id: randomUUID(),
+          application_id: id,
+          action: "UPDATE_APPLICATION",
+          actor,
+          old_value: `${oldApp.ticket_number} | ${oldApp.applicant_name}`,
+          new_value: `${ticketNumber} | ${applicantName}`,
+          ip: null,
+          created_at: now,
+        });
+      }
+    });
 
     revalidatePath("/admin");
     return { ok: true };
@@ -160,12 +196,13 @@ export async function deleteApplication(
   id: string,
 ): Promise<ApplicationActionResult> {
   try {
-    if (!(await getSession())) {
-      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    const actor = await getSession();
+    if (!actor) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
     const app = await db
-      .select({ id: applications.id })
+      .select({ id: applications.id, ticket_number: applications.ticket_number })
       .from(applications)
       .where(and(eq(applications.id, id), isNull(applications.deleted_at)))
       .get();
@@ -187,6 +224,17 @@ export async function deleteApplication(
         .update(applications)
         .set({ deleted_at: now })
         .where(eq(applications.id, id));
+
+      await tx.insert(audit_logs).values({
+        id: randomUUID(),
+        application_id: id,
+        action: "DELETE_APPLICATION",
+        actor,
+        old_value: app.ticket_number,
+        new_value: "DIHAPUS",
+        ip: null,
+        created_at: now,
+      });
     });
 
     revalidatePath("/admin");
@@ -324,3 +372,39 @@ export async function updateMissingDocs(
     };
   }
 }
+
+export async function getAuditLogs(
+  applicationId: string,
+): Promise<{ ok: true; logs: AuditLogItem[] } | { ok: false; error: string }> {
+  try {
+    const actor = await getSession();
+    if (!actor) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
+    }
+
+    const rows = await db
+      .select({
+        id: audit_logs.id,
+        applicationId: audit_logs.application_id,
+        action: audit_logs.action,
+        actor: audit_logs.actor,
+        oldValue: audit_logs.old_value,
+        newValue: audit_logs.new_value,
+        ip: audit_logs.ip,
+        createdAt: audit_logs.created_at,
+      })
+      .from(audit_logs)
+      .where(eq(audit_logs.application_id, applicationId))
+      .orderBy(desc(audit_logs.created_at))
+      .limit(50);
+
+    return { ok: true, logs: rows };
+  } catch (err) {
+    console.error("getAuditLogs error:", err);
+    return {
+      ok: false,
+      error: "Gagal memuat log audit.",
+    };
+  }
+}
+

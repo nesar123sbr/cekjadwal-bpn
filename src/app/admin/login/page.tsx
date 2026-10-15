@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import LoginForm from "@/components/admin/LoginForm";
 import { getSession } from "@/lib/session";
 
-export const metadata = { title: "Login TU - CekJadwal BPN" };
+export const metadata = {
+  title: "Login TU - CekJadwal BPN",
+  robots: { index: false, follow: false },
+};
 
 export default async function AdminLoginPage() {
   if (await getSession()) redirect("/admin");

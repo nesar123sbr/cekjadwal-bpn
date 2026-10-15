@@ -48,6 +48,7 @@ export type SearchResultItem =
 
 export type SearchResult =
   | { status: "TIDAK_DITEMUKAN" }
+  | { status: "GANGGUAN_LAYANAN" }
   | {
       status: "DITEMUKAN";
       items: SearchResultItem[];
@@ -191,6 +192,6 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
     };
   } catch (err) {
     console.error("searchTicket error:", err);
-    return { status: "TIDAK_DITEMUKAN" };
+    return { status: "GANGGUAN_LAYANAN" };
   }
 }

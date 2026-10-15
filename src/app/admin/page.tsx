@@ -16,56 +16,71 @@ import { getSession } from "@/lib/session";
 import { daysBetween } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Dashboard TU - CekJadwal BPN" };
+export const metadata = {
+  title: "Dashboard TU - CekJadwal BPN",
+  robots: { index: false, follow: false },
+};
 
 export default async function AdminPage() {
   if (!(await getSession())) redirect("/admin/login");
 
-  const [apps, activeSchedules, team, officerList, allVisits, cancelledSchedules] =
-    await Promise.all([
-      db
-        .select()
-        .from(applications)
-        .where(isNull(applications.deleted_at))
-        .orderBy(desc(applications.created_at)),
-      db.select().from(schedules).where(eq(schedules.status, "AKTIF")),
-      db
-        .select({
-          scheduleId: schedule_officers.schedule_id,
-          officerId: officers.id,
-          name: officers.name,
-        })
-        .from(schedule_officers)
-        .innerJoin(officers, eq(schedule_officers.officer_id, officers.id)),
-      db
-        .select()
-        .from(officers)
-        .where(isNull(officers.deleted_at))
-        .orderBy(asc(officers.name)),
-      db
-        .select()
-        .from(application_visits)
-        .orderBy(
-          asc(application_visits.visit_date),
-          asc(application_visits.created_at),
+  const [
+    apps,
+    activeSchedules,
+    team,
+    officerList,
+    inactiveOfficerList,
+    allVisits,
+    cancelledSchedules,
+  ] = await Promise.all([
+    db
+      .select()
+      .from(applications)
+      .where(isNull(applications.deleted_at))
+      .orderBy(desc(applications.created_at)),
+    db.select().from(schedules).where(eq(schedules.status, "AKTIF")),
+    db
+      .select({
+        scheduleId: schedule_officers.schedule_id,
+        officerId: officers.id,
+        name: officers.name,
+      })
+      .from(schedule_officers)
+      .innerJoin(officers, eq(schedule_officers.officer_id, officers.id)),
+    db
+      .select()
+      .from(officers)
+      .where(isNull(officers.deleted_at))
+      .orderBy(asc(officers.name)),
+    db
+      .select()
+      .from(officers)
+      .where(isNotNull(officers.deleted_at))
+      .orderBy(asc(officers.name)),
+    db
+      .select()
+      .from(application_visits)
+      .orderBy(
+        asc(application_visits.visit_date),
+        asc(application_visits.created_at),
+      ),
+    db
+      .select({
+        applicationId: schedules.application_id,
+        cancelReason: schedules.cancel_reason,
+      })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.status, "DIBATALKAN"),
+          isNotNull(schedules.cancel_reason),
         ),
-      db
-        .select({
-          applicationId: schedules.application_id,
-          cancelReason: schedules.cancel_reason,
-        })
-        .from(schedules)
-        .where(
-          and(
-            eq(schedules.status, "DIBATALKAN"),
-            isNotNull(schedules.cancel_reason),
-          ),
-        )
-        .orderBy(
-          desc(schedules.inspection_date),
-          desc(schedules.inspection_time),
-        ),
-    ]);
+      )
+      .orderBy(
+        desc(schedules.inspection_date),
+        desc(schedules.inspection_time),
+      ),
+  ]);
 
   const cancelReasonByApp = new Map<string, string>();
   for (const cs of cancelledSchedules) {
@@ -136,6 +151,11 @@ export default async function AdminPage() {
         <AdminTable
           rows={rows}
           officers={officerList.map((o) => ({
+            id: o.id,
+            name: o.name,
+            position: o.position,
+          }))}
+          inactiveOfficers={inactiveOfficerList.map((o) => ({
             id: o.id,
             name: o.name,
             position: o.position,

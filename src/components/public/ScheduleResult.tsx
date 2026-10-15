@@ -180,6 +180,23 @@ function ResultCard({ item }: { item: SearchResultItem }) {
 type Props = { result: SearchResult };
 
 export default function ScheduleResult({ result }: Props) {
+  if (result.status === "GANGGUAN_LAYANAN") {
+    return (
+      <section
+        role="status"
+        className="w-full rounded-2xl border border-amber-300 bg-amber-50 p-5"
+      >
+        <h2 className="text-lg font-semibold text-amber-800">
+          Layanan Sedang Gangguan
+        </h2>
+        <p className="mt-1 text-sm text-amber-700">
+          Sistem sedang mengalami gangguan sementara. Data berkas Anda tidak hilang.
+          Silakan coba lagi beberapa saat lagi.
+        </p>
+      </section>
+    );
+  }
+
   if (result.status === "TIDAK_DITEMUKAN" || result.items.length === 0) {
     return (
       <section role="status" className="w-full rounded-2xl border border-gray-300 bg-gray-100 p-5">

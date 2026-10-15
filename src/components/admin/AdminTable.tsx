@@ -11,9 +11,11 @@ import {
   addVisitLog,
   createApplication,
   deleteApplication,
+  getAuditLogs,
   getVisitLogs,
   updateApplication,
   updateMissingDocs,
+  type AuditLogItem,
   type ReceiptData,
   type VisitLogItem,
 } from "@/actions/application";
@@ -25,7 +27,7 @@ import {
   updateOfficialFileNumber,
   updateSchedule,
 } from "@/actions/schedule";
-import { addOfficer, deleteOfficer } from "@/actions/officer";
+import { addOfficer, deleteOfficer, reactivateOfficer } from "@/actions/officer";
 import type { ApplicationStatus } from "@/db/schema";
 import { getTodayWib } from "@/lib/utils";
 import ReceiptModal from "./ReceiptModal";
@@ -64,6 +66,14 @@ const STATUS_STYLE: Record<ApplicationStatus, string> = {
   VERIFIKASI_PETUGAS: "bg-amber-50 text-amber-700 border border-amber-200",
   DIJADWALKAN: "bg-blue-50 text-blue-700 border border-blue-200",
   SELESAI: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+};
+
+const AUDIT_ACTION_LABEL: Record<string, string> = {
+  CANCEL_SCHEDULE: "Jadwal dibatalkan",
+  UPDATE_OFFICIAL_NUMBER: "Nomor resmi dikoreksi",
+  REOPEN_APPLICATION: "Berkas dibuka kembali",
+  UPDATE_APPLICATION: "Data berkas diubah",
+  DELETE_APPLICATION: "Berkas dihapus",
 };
 
 const DEFAULT_NOTES = "Harap patok batas terpasang";
@@ -215,9 +225,11 @@ function parseAddress(rawAddress: string): {
 export default function AdminTable({
   rows,
   officers,
+  inactiveOfficers = [],
 }: {
   rows: AdminRow[];
   officers: OfficerOption[];
+  inactiveOfficers?: OfficerOption[];
 }) {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [error, setError] = useState<string | null>(null);
@@ -254,14 +266,18 @@ export default function AdminTable({
   const [cancelReason, setCancelReason] = useState("");
   const [correctionNumber, setCorrectionNumber] = useState("");
 
-  // Modal riwayat kunjungan
+  // Modal riwayat kunjungan & riwayat perubahan (audit logs)
   const [visitLogs, setVisitLogs] = useState<VisitLogItem[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(false);
   const [visitDateInput, setVisitDateInput] = useState("");
   const [visitNotesInput, setVisitNotesInput] = useState("");
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
 
   // Kelola Petugas (Dinamis)
   const [officerList, setOfficerList] = useState<OfficerOption[]>(officers);
+  const [inactiveOfficerList, setInactiveOfficerList] =
+    useState<OfficerOption[]>(inactiveOfficers);
   const [officerNameInput, setOfficerNameInput] = useState("");
   const [officerPositionInput, setOfficerPositionInput] = useState("");
   const [officerError, setOfficerError] = useState<string | null>(null);
@@ -340,11 +356,39 @@ export default function AdminTable({
   async function handleDeleteOfficer(id: string) {
     setOfficerError(null);
     setOfficerPending(true);
+    const deletedOfficer = officerList.find((o) => o.id === id);
     const res = await deleteOfficer(id);
     setOfficerPending(false);
     if (res.ok) {
       setOfficerList((prev) => prev.filter((o) => o.id !== id));
       setSelectedOfficers((prev) => prev.filter((oId) => oId !== id));
+      if (deletedOfficer) {
+        setInactiveOfficerList((prev) =>
+          [...prev, deletedOfficer].sort((a, b) =>
+            a.name.localeCompare(b.name, "id"),
+          ),
+        );
+      }
+    } else {
+      setOfficerError(res.error);
+    }
+  }
+
+  async function handleReactivateOfficer(id: string) {
+    setOfficerError(null);
+    setOfficerPending(true);
+    const reactivated = inactiveOfficerList.find((o) => o.id === id);
+    const res = await reactivateOfficer(id);
+    setOfficerPending(false);
+    if (res.ok) {
+      setInactiveOfficerList((prev) => prev.filter((o) => o.id !== id));
+      if (reactivated) {
+        setOfficerList((prev) =>
+          [...prev, reactivated].sort((a, b) =>
+            a.name.localeCompare(b.name, "id"),
+          ),
+        );
+      }
     } else {
       setOfficerError(res.error);
     }
@@ -432,15 +476,25 @@ export default function AdminTable({
     setVisitDateInput(new Date().toISOString().slice(0, 10));
     setVisitNotesInput("");
     setLoadingVisits(true);
+    setLoadingAuditLogs(true);
     setVisitLogs([]);
+    setAuditLogs([]);
     setDialog({ kind: "history", row });
-    const res = await getVisitLogs(row.id);
-    if (res.ok) {
-      setVisitLogs(res.visits);
+    const [visitRes, auditRes] = await Promise.all([
+      getVisitLogs(row.id),
+      getAuditLogs(row.id),
+    ]);
+    if (visitRes.ok) {
+      setVisitLogs(visitRes.visits);
     } else {
-      setError(res.error);
+      setError(visitRes.error);
     }
     setLoadingVisits(false);
+
+    if (auditRes.ok) {
+      setAuditLogs(auditRes.logs);
+    }
+    setLoadingAuditLogs(false);
   }
 
   function toggleOfficer(id: string) {
@@ -1807,6 +1861,48 @@ export default function AdminTable({
               )}
             </div>
 
+            {/* Riwayat Perubahan (Audit Logs) */}
+            <div className="border-t border-gray-200 pt-3">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-700">
+                Riwayat Perubahan ({auditLogs.length})
+              </p>
+              {loadingAuditLogs && auditLogs.length === 0 ? (
+                <p className="py-4 text-center text-xs text-gray-500">
+                  Memuat riwayat perubahan...
+                </p>
+              ) : auditLogs.length === 0 ? (
+                <p className="py-4 text-center text-xs text-gray-500">
+                  Belum ada riwayat perubahan data pada berkas ini.
+                </p>
+              ) : (
+                <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
+                  {auditLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="rounded-lg border border-gray-200 bg-slate-50/80 p-2.5 text-xs space-y-1 shadow-xs"
+                    >
+                      <div className="flex items-center justify-between text-gray-500 text-[11px]">
+                        <span>{formatDateTimeWib(log.createdAt)}</span>
+                        {log.actor && (
+                          <span className="font-medium text-gray-700">
+                            oleh {log.actor}
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-semibold text-gray-900">
+                        {AUDIT_ACTION_LABEL[log.action] ?? log.action}
+                      </div>
+                      {(log.oldValue || log.newValue) && (
+                        <div className="text-gray-600 font-mono text-[11px] break-all">
+                          {log.oldValue ?? "-"} → {log.newValue ?? "-"}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-end border-t border-gray-200 pt-3">
               <button
                 type="button"
@@ -1827,6 +1923,9 @@ export default function AdminTable({
             <h2 id="edit-title" className="text-lg font-bold text-gray-900">
               Edit Identitas Berkas
             </h2>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              Mengubah nomor tiket atau nama membuat QR pada tanda terima yang sudah dicetak tidak lagi menemukan berkas ini. Cetak ulang tanda terima bila perlu.
+            </div>
             <div>
               <label
                 htmlFor="edit-tn"
@@ -2555,6 +2654,36 @@ export default function AdminTable({
                 </div>
               )}
             </div>
+
+            {/* Petugas Nonaktif (Arsip Riwayat) */}
+            {inactiveOfficerList.length > 0 && (
+              <div className="mt-4 border-t border-gray-200 pt-3">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+                  Petugas Nonaktif (arsip riwayat) ({inactiveOfficerList.length})
+                </p>
+                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                  {inactiveOfficerList.map((o) => (
+                    <div
+                      key={o.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-3 text-xs"
+                    >
+                      <div className="min-w-0 flex-1 opacity-75">
+                        <div className="font-semibold text-gray-800">{o.name}</div>
+                        <div className="text-[11px] text-gray-500">{o.position}</div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={officerPending}
+                        onClick={() => handleReactivateOfficer(o.id)}
+                        className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition shrink-0"
+                      >
+                        {officerPending ? "Memproses..." : "Aktifkan Kembali"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end border-t border-gray-200 pt-3">
               <button
