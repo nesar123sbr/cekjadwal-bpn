@@ -50,7 +50,7 @@ export default function BrandHeader({
       <div className="relative z-10 mx-auto flex max-w-[1536px] items-center gap-3.5 px-3 sm:px-6 lg:px-8 py-4">
         <Image
           src="/logo-bpn.svg"
-          alt="Logo Kementerian ATR/BPN"
+          alt="Logo ATR/BPN"
           width={44}
           height={44}
           priority
@@ -58,8 +58,7 @@ export default function BrandHeader({
         />
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase leading-tight tracking-wider text-[#D4AF37] sm:text-xs">
-            Kementerian Agraria dan Tata Ruang /
-            <br className="sm:hidden" /> Badan Pertanahan Nasional
+            Kantor Pertanahan Kabupaten Dairi
           </p>
           <p className="mt-1 text-sm font-medium leading-tight text-slate-100 sm:text-base">
             Sistem Pemantauan Pra-Berkas &amp; Verifikasi Lapangan

@@ -140,10 +140,10 @@ function validateOfficialFileNumber(
 ): { ok: true; value: string } | { ok: false; error: string } {
   const clean = (raw ?? "").trim();
   if (!clean) {
-    return { ok: false, error: "Nomor Berkas Resmi BPN wajib diisi." };
+    return { ok: false, error: "Nomor Pendaftaran SK wajib diisi." };
   }
   if (clean.length > 50) {
-    return { ok: false, error: "Nomor Berkas Resmi BPN maksimal 50 karakter." };
+    return { ok: false, error: "Nomor Pendaftaran SK maksimal 50 karakter." };
   }
   return { ok: true, value: clean };
 }
@@ -184,7 +184,7 @@ export async function markApplicationComplete(
       )
       .get();
     if (duplicate && duplicate.id !== applicationId) {
-      return { ok: false, error: "Nomor Berkas Resmi sudah dipakai berkas lain." };
+      return { ok: false, error: "Nomor Pendaftaran SK sudah dipakai berkas lain." };
     }
 
     const now = getNowWibIso();
@@ -437,7 +437,7 @@ export async function updateOfficialFileNumber(
       return {
         ok: false,
         error:
-          "Hanya berkas berstatus Selesai yang dapat diubah nomor berkas resminya.",
+          "Hanya berkas berstatus Selesai yang dapat diubah Nomor Pendaftaran SK-nya.",
       };
     }
 
@@ -457,7 +457,7 @@ export async function updateOfficialFileNumber(
       )
       .get();
     if (duplicate && duplicate.id !== applicationId) {
-      return { ok: false, error: "Nomor Berkas Resmi sudah dipakai berkas lain." };
+      return { ok: false, error: "Nomor Pendaftaran SK sudah dipakai berkas lain." };
     }
 
     const now = getNowWibIso();
@@ -485,7 +485,7 @@ export async function updateOfficialFileNumber(
     console.error("updateOfficialFileNumber error:", err);
     return {
       ok: false,
-      error: "Terjadi kendala saat mengoreksi nomor berkas resmi. Silakan coba lagi.",
+      error: "Terjadi kendala saat mengoreksi Nomor Pendaftaran SK. Silakan coba lagi.",
     };
   }
 }

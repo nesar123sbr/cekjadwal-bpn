@@ -56,7 +56,7 @@ async function seed() {
       id: "app-1201",
       ticket_number: "REG-1201/2026",
       applicant_name: "Ahmad Syahputra",
-      object_address: "Jl. Merdeka No. 12, Kel. Sukajadi, Kec. Coblong",
+      object_address: "Jl. S.M. Raja No. 12, Kel. Batang Beruh, Kec. Sidikalang",
       status: "MENUNGGU_DOKUMEN",
       missing_documents:
         "FC KTP batas tanah sebelah utara\nSurat sporadik belum ttd kades",
@@ -68,7 +68,7 @@ async function seed() {
       id: "app-1201-b",
       ticket_number: "REG-1201/2026",
       applicant_name: "Ahmad Syahputra",
-      object_address: "Jl. Dago Barat No. 45, Kel. Dago, Kec. Coblong",
+      object_address: "Jl. Rambutan No. 45, Desa Sitinjo, Kec. Sitinjo",
       status: "VERIFIKASI_PETUGAS",
       created_at: daysAgo(5),
       status_updated_at: daysAgo(5),
@@ -78,17 +78,17 @@ async function seed() {
       id: "app-1202",
       ticket_number: "REG-1202/2026",
       applicant_name: "Bambang Sudirgo",
-      object_address: "Jl. Melati No. 7, Kel. Cihapit, Kec. Bandung Wetan",
+      object_address: "Jl. Pegagan No. 7, Desa Pegagan Julu, Kec. Sumbul",
       status: "DIJADWALKAN",
       created_at: daysAgo(12),
       status_updated_at: daysAgo(2),
     },
     {
-      // Skenario 3: selesai, sudah ber-nomor berkas resmi
+      // Skenario 3: selesai, sudah ber-nomor pendaftaran SK
       id: "app-1203",
       ticket_number: "REG-1203/2026",
       applicant_name: "Christine Natalia",
-      object_address: "Jl. Kenanga No. 3, Kel. Lebak Gede, Kec. Coblong",
+      object_address: "Jl. Gereja No. 3, Desa Berampu, Kec. Berampu",
       status: "SELESAI",
       official_file_number: "1203/2026",
       created_at: daysAgo(20),

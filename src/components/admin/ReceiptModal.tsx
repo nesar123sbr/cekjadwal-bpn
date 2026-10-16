@@ -61,20 +61,15 @@ export default function ReceiptModal({
             <div className="mb-2 flex justify-center">
               <Image
                 src="/logo-bpn.svg"
-                alt="Logo Kementerian ATR/BPN"
+                alt="Logo ATR/BPN"
                 width={48}
                 height={48}
                 priority
                 className="h-12 w-12 object-contain"
               />
             </div>
-            <p className="text-[11px] font-semibold uppercase leading-tight tracking-wider text-[#002B49]">
-              Kementerian Agraria dan Tata Ruang /
-              <br />
-              Badan Pertanahan Nasional
-            </p>
-            <p className="mt-1 text-sm font-bold uppercase text-[#002B49]">
-              Kantor Pertanahan
+            <p className="text-sm font-bold uppercase text-[#002B49]">
+              Kantor Pertanahan Kabupaten Dairi
             </p>
             <h2 id="receipt-title" className="mt-2 text-lg font-bold">
               Lembar Tanda Terima Registrasi

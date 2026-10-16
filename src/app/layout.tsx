@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CekJadwal BPN - Kementerian ATR/BPN",
-  description: "Sistem Pemantauan Pra-Berkas & Verifikasi Lapangan",
+  title: "CekJadwal BPN - Kantor Pertanahan Kabupaten Dairi",
+  description:
+    "Sistem Pemantauan Pra-Berkas & Verifikasi Lapangan - Kantor Pertanahan Kabupaten Dairi",
 };
 
 export default function RootLayout({

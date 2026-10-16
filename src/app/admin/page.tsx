@@ -17,7 +17,7 @@ import { daysBetween } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Dashboard TU - CekJadwal BPN",
+  title: "Dashboard TU - CekJadwal BPN Kabupaten Dairi",
   robots: { index: false, follow: false },
 };
 
@@ -134,7 +134,7 @@ export default async function AdminPage() {
         <div className="border-b border-gray-200/90 bg-white/90 backdrop-blur-xs">
           <div className="mx-auto flex w-full max-w-[1536px] items-center justify-between px-3 sm:px-6 lg:px-8 py-3.5">
             <h1 className="text-lg font-bold text-[#002B49]">
-              Dashboard TU - CekJadwal Pemeriksaan Tanah BPN
+              Dashboard TU - CekJadwal Pemeriksaan Tanah
             </h1>
             <form action={logoutAction}>
               <button

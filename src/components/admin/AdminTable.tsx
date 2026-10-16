@@ -70,7 +70,7 @@ const STATUS_STYLE: Record<ApplicationStatus, string> = {
 
 const AUDIT_ACTION_LABEL: Record<string, string> = {
   CANCEL_SCHEDULE: "Jadwal dibatalkan",
-  UPDATE_OFFICIAL_NUMBER: "Nomor resmi dikoreksi",
+  UPDATE_OFFICIAL_NUMBER: "Nomor Pendaftaran SK dikoreksi",
   REOPEN_APPLICATION: "Berkas dibuka kembali",
   UPDATE_APPLICATION: "Data berkas diubah",
   DELETE_APPLICATION: "Berkas dihapus",
@@ -258,11 +258,11 @@ export default function AdminTable({
   const [village, setVillage] = useState("");
   const [streetDetail, setStreetDetail] = useState("");
 
-  // Form dokumen kurang / nomor resmi
+  // Form dokumen kurang / nomor pendaftaran SK
   const [docs, setDocs] = useState("");
   const [officialNumber, setOfficialNumber] = useState("");
 
-  // Form pembatalan jadwal / koreksi nomor resmi
+  // Form pembatalan jadwal / koreksi nomor pendaftaran SK
   const [cancelReason, setCancelReason] = useState("");
   const [correctionNumber, setCorrectionNumber] = useState("");
 
@@ -609,7 +609,7 @@ export default function AdminTable({
     e.preventDefault();
     if (dialog?.kind !== "complete") return;
     if (!officialNumber.trim()) {
-      return setError("Nomor Berkas Resmi BPN wajib diisi.");
+      return setError("Nomor Pendaftaran SK wajib diisi.");
     }
     setError(null);
     run(() => markApplicationComplete(dialog.row.id, officialNumber));
@@ -629,10 +629,10 @@ export default function AdminTable({
     e.preventDefault();
     if (dialog?.kind !== "correction") return;
     if (!correctionNumber.trim()) {
-      return setError("Nomor Berkas Resmi BPN wajib diisi.");
+      return setError("Nomor Pendaftaran SK wajib diisi.");
     }
     if (correctionNumber.trim().length > 50) {
-      return setError("Nomor Berkas Resmi BPN maksimal 50 karakter.");
+      return setError("Nomor Pendaftaran SK maksimal 50 karakter.");
     }
     setError(null);
     run(() => updateOfficialFileNumber(dialog.row.id, correctionNumber.trim()));
@@ -790,7 +790,7 @@ export default function AdminTable({
       "Tanggal Jadwal",
       "Petugas Ukur",
       "Dokumen Kurang",
-      "No. Berkas Resmi",
+      "Nomor Pendaftaran SK",
     ];
 
     const csvRows = filteredRows.map((r) => [
@@ -1331,7 +1331,7 @@ export default function AdminTable({
                       )}
                       {r.status === "SELESAI" && r.officialFileNumber && (
                         <p className="text-[11px] font-medium text-emerald-700">
-                          No. Resmi: {r.officialFileNumber}
+                          Nomor Pendaftaran SK: {r.officialFileNumber}
                         </p>
                       )}
                     </div>
@@ -1670,7 +1670,7 @@ export default function AdminTable({
                                       d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                                     />
                                   </svg>
-                                  <span>Koreksi Nomor Berkas Resmi</span>
+                                  <span>Koreksi Nomor Pendaftaran SK</span>
                                 </button>
                                 <button
                                   type="button"
@@ -1977,7 +1977,7 @@ export default function AdminTable({
                     type="text"
                     required
                     list="district-options"
-                    placeholder="Contoh: Sidikalang / Coblong"
+                    placeholder="Contoh: Sidikalang / Sumbul"
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
                     className={inputCls}
@@ -1994,7 +1994,7 @@ export default function AdminTable({
                     id="edit-vill"
                     type="text"
                     required
-                    placeholder="Contoh: Batang Beruh / Sukajadi"
+                    placeholder="Contoh: Batang Beruh / Pegagan Julu"
                     value={village}
                     onChange={(e) => setVillage(e.target.value)}
                     className={inputCls}
@@ -2233,7 +2233,7 @@ export default function AdminTable({
                     type="text"
                     required
                     list="district-options"
-                    placeholder="Contoh: Sidikalang / Coblong"
+                    placeholder="Contoh: Sidikalang / Sumbul"
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
                     className={inputCls}
@@ -2250,7 +2250,7 @@ export default function AdminTable({
                     id="new-vill"
                     type="text"
                     required
-                    placeholder="Contoh: Batang Beruh / Sukajadi"
+                    placeholder="Contoh: Batang Beruh / Pegagan Julu"
                     value={village}
                     onChange={(e) => setVillage(e.target.value)}
                     className={inputCls}
@@ -2348,7 +2348,7 @@ export default function AdminTable({
                 htmlFor="official"
                 className="block text-sm font-medium text-gray-700"
               >
-                Nomor Berkas Resmi BPN
+                Nomor Pendaftaran SK
               </label>
               <input
                 id="official"
@@ -2359,7 +2359,7 @@ export default function AdminTable({
                 className={inputCls}
               />
               <p className="mt-1 text-xs text-gray-500">
-                Nomor dari aplikasi Sentuh Tanahku. Akan ditampilkan kepada
+                Nomor Pendaftaran SK dari aplikasi Sentuh Tanahku. Akan ditampilkan kepada
                 pemohon.
               </p>
             </div>
@@ -2420,7 +2420,7 @@ export default function AdminTable({
         </Modal>
       )}
 
-      {/* Modal: Koreksi Nomor Berkas Resmi */}
+      {/* Modal: Koreksi Nomor Pendaftaran SK */}
       {dialog?.kind === "correction" && (
         <Modal titleId="correction-title">
           <form onSubmit={submitCorrection} className="space-y-4">
@@ -2429,10 +2429,10 @@ export default function AdminTable({
                 id="correction-title"
                 className="text-lg font-bold text-gray-900"
               >
-                Koreksi Nomor Berkas Resmi - {dialog.row.ticketNumber}
+                Koreksi Nomor Pendaftaran SK - {dialog.row.ticketNumber}
               </h2>
               <p className="mt-1 text-xs text-gray-600">
-                Perbarui nomor berkas resmi BPN Sentuh Tanahku tanpa mengubah status atau tanggal penyelesaian berkas.
+                Perbarui Nomor Pendaftaran SK BPN Sentuh Tanahku tanpa mengubah status atau tanggal penyelesaian berkas.
               </p>
             </div>
             <div>
@@ -2440,7 +2440,7 @@ export default function AdminTable({
                 htmlFor="correction-official"
                 className="block text-sm font-medium text-gray-700"
               >
-                Nomor Berkas Resmi BPN Baru <span className="text-red-500">*</span>
+                Nomor Pendaftaran SK Baru <span className="text-red-500">*</span>
               </label>
               <input
                 id="correction-official"
@@ -2501,7 +2501,7 @@ export default function AdminTable({
                   Bila jadwal lama tidak dapat dipulihkan (petugas nonaktif atau jadwal tidak ada), berkas kembali ke antrean <strong>Verifikasi Petugas</strong> dan perlu dijadwalkan ulang.
                 </li>
                 <li>
-                  Nomor berkas resmi sebelumnya akan dikosongkan.
+                  Nomor Pendaftaran SK sebelumnya akan dikosongkan.
                 </li>
               </ul>
             </div>

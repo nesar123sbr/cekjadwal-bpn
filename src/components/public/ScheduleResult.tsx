@@ -164,12 +164,12 @@ function ResultCard({ item }: { item: SearchResultItem }) {
       <div className="mt-4 rounded-xl border-2 border-blue-300 bg-white p-4 text-blue-900">
         <p className="text-sm font-semibold">Lanjutkan Cek di Aplikasi Sentuh Tanahku</p>
         <p className="mt-2 text-xs uppercase tracking-wide text-blue-700">
-          Nomor Berkas Resmi
+          Nomor Pendaftaran SK
         </p>
         <p className="text-2xl font-bold">{item.officialFileNumber}</p>
         <p className="mt-2 text-sm">
           Silakan pantau kelanjutan berkas Anda di aplikasi Sentuh Tanahku
-          menggunakan nomor berkas di atas.
+          menggunakan Nomor Pendaftaran SK di atas.
         </p>
       </div>
       <Duration days={item.daysInProcess} label="" />

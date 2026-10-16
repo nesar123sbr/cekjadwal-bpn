@@ -14,7 +14,7 @@ export function maskName(name: string): string {
 
 /**
  * Sensor alamat: sembunyikan nama/nomor jalan, sisakan kelurahan/kecamatan.
- * Contoh: "Jl. Merdeka No. 12, Kel. Sukajadi, Kec. Coblong" -> "**** , Kel. Sukajadi, Kec. Coblong"
+ * Contoh: "Jl. S.M. Raja No. 12, Kel. Batang Beruh, Kec. Sidikalang" -> "**** , Kel. Batang Beruh, Kec. Sidikalang"
  */
 export function maskAddress(address: string): string {
   const segments = address
