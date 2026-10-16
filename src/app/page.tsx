@@ -58,7 +58,7 @@ export default async function Home({
             className="text-xs text-gray-400 hover:text-gray-600 transition underline-offset-4 hover:underline"
             href="/admin"
           >
-            Akses Internal Petugas Loket / TU
+            Akses Internal Petugas Loket
           </Link>
         </footer>
       </main>

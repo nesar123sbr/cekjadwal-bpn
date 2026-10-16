@@ -6,7 +6,7 @@ import TopographicBackground from "@/components/TopographicBackground";
 import { getSession } from "@/lib/session";
 
 export const metadata = {
-  title: "Login TU - CekJadwal BPN Kabupaten Dairi",
+  title: "Login Loket - CekJadwal BPN Kabupaten Dairi",
   robots: { index: false, follow: false },
 };
 
@@ -29,13 +29,13 @@ export default async function AdminLoginPage() {
           <div className="w-full rounded-2xl border border-gray-200/90 bg-white/95 p-6 sm:p-8 shadow-sm backdrop-blur-xs">
             <div className="text-center mb-6">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200/80">
-                Akses Internal Petugas Loket / TU
+                Akses Internal Petugas Loket
               </span>
               <h1 className="mt-3 text-2xl font-bold tracking-tight text-[#002B49]">
-                Login Staf TU
+                Login Petugas Loket
               </h1>
               <p className="mt-1 text-xs sm:text-sm text-gray-600">
-                ATR/BPN Kabupaten Dairi
+                Kantor Pertanahan Kabupaten Dairi
               </p>
             </div>
             <LoginForm />
@@ -46,7 +46,7 @@ export default async function AdminLoginPage() {
               href="/"
               className="text-xs text-gray-500 hover:text-[#002B49] transition underline-offset-4 hover:underline"
             >
-              ← Kembali ke halaman cek jadwal
+              ← Kembali ke Halaman Cek Jadwal
             </Link>
           </div>
         </div>

@@ -51,16 +51,16 @@ export default function BrandHeader({
         <Image
           src="/logo-bpn.svg"
           alt="Logo ATR/BPN"
-          width={44}
-          height={44}
+          width={52}
+          height={52}
           priority
-          className="h-11 w-11 shrink-0 object-contain drop-shadow-sm"
+          className="h-12 w-12 sm:h-[52px] sm:w-[52px] shrink-0 object-contain drop-shadow-sm"
         />
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase leading-tight tracking-wider text-[#D4AF37] sm:text-xs">
+          <p className="text-base font-bold uppercase leading-tight tracking-wide text-[#D4AF37] sm:text-xl">
             Kantor Pertanahan Kabupaten Dairi
           </p>
-          <p className="mt-1 text-sm font-medium leading-tight text-slate-100 sm:text-base">
+          <p className="mt-0.5 text-xs font-normal leading-tight text-slate-200 sm:text-sm">
             Sistem Pemantauan Pra-Berkas &amp; Verifikasi Lapangan
           </p>
         </div>
