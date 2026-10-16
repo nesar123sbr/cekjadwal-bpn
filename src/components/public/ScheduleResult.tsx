@@ -81,17 +81,43 @@ function ResultCard({ item }: { item: SearchResultItem }) {
   }
 
   if (item.status === "MENUNGGU_JADWAL") {
+    const isPemohonAbsen =
+      item.previouslyCancelled && item.cancelCategory === "PEMOHON_ABSEN";
+
     return (
       <section role="status" className="w-full rounded-2xl border border-amber-200 bg-amber-50 p-5">
         <h2 className="text-lg font-semibold text-amber-800">Menunggu Jadwal Pemeriksaan</h2>
         <p className="mt-1 text-sm text-amber-700">
           Dokumen Anda lengkap. Berkas sedang antre verifikasi dan penjadwalan
-          oleh petugas. Anda tidak perlu melakukan apa pun.
+          oleh petugas.
+          {!isPemohonAbsen && " Anda tidak perlu melakukan apa pun."}
         </p>
         {item.previouslyCancelled && (
-          <p className="mt-2 text-xs italic text-amber-800">
-            Jadwal pemeriksaan sebelumnya dibatalkan. Petugas akan menetapkan jadwal baru dan informasinya akan tampil di halaman ini.
-          </p>
+          <>
+            {item.cancelCategory === "PEMOHON_ABSEN" ? (
+              <div className="mt-3 rounded-xl border border-amber-300 bg-white/80 p-3.5 text-sm text-amber-900 space-y-1">
+                <p className="font-semibold text-amber-950">
+                  Pemeriksaan Belum Dapat Dilaksanakan
+                </p>
+                <p className="text-xs sm:text-sm leading-relaxed">
+                  Pada jadwal sebelumnya, petugas telah datang ke lokasi namun pemohon atau kuasa tidak berada di tempat. Petugas loket akan menghubungi Anda untuk menetapkan jadwal ulang. Jika keperluan Anda mendesak, silakan segera hubungi loket pelayanan.
+                </p>
+              </div>
+            ) : item.cancelCategory === "PETUGAS_HALANGAN" ? (
+              <div className="mt-3 rounded-xl border border-amber-300 bg-white/80 p-3.5 text-sm text-amber-900 space-y-1">
+                <p className="font-semibold text-amber-950">
+                  Jadwal Pemeriksaan Sedang Disusun Ulang
+                </p>
+                <p className="text-xs sm:text-sm leading-relaxed">
+                  Mohon maaf, pemeriksaan pada jadwal sebelumnya belum dapat dilaksanakan karena petugas berhalangan atau ada kendala di lapangan.{item.cancelPublicNote ? ` Keterangan: ${item.cancelPublicNote}.` : ""} Petugas sedang menetapkan jadwal pengganti dan informasinya akan tampil di halaman ini.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs italic text-amber-800">
+                Jadwal pemeriksaan sebelumnya dibatalkan. Petugas akan menetapkan jadwal baru dan informasinya akan tampil di halaman ini.
+              </p>
+            )}
+          </>
         )}
         {header}
         <Duration
@@ -108,6 +134,20 @@ function ResultCard({ item }: { item: SearchResultItem }) {
     return (
       <section role="status" className="w-full rounded-2xl border border-green-200 bg-green-50 p-5">
         <h2 className="text-lg font-semibold text-green-800">Jadwal pemeriksaan ditetapkan</h2>
+        {item.isRescheduled && (
+          <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/90 p-3.5 text-sm text-blue-900 space-y-1">
+            <p className="font-semibold text-blue-950">Jadwal Pengganti</p>
+            <p className="text-xs sm:text-sm text-blue-800 leading-relaxed">
+              {item.cancelCategory === "PEMOHON_ABSEN"
+                ? "Jadwal sebelumnya tidak dapat dilaksanakan karena pemohon atau kuasa tidak berada di lokasi. Ini adalah jadwal pengganti; pastikan pemohon atau kuasa hadir."
+                : item.cancelCategory === "PETUGAS_HALANGAN"
+                  ? item.cancelPublicNote
+                    ? `Jadwal sebelumnya belum dapat dilaksanakan karena petugas berhalangan (${item.cancelPublicNote}). Ini adalah jadwal pengganti.`
+                    : "Jadwal sebelumnya belum dapat dilaksanakan karena petugas berhalangan. Ini adalah jadwal pengganti."
+                  : "Ini adalah jadwal pengganti; jadwal pemeriksaan telah diperbarui oleh petugas."}
+            </p>
+          </div>
+        )}
         {isPast && (
           <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-sm text-amber-900 flex items-start gap-2.5">
             <svg
@@ -164,12 +204,12 @@ function ResultCard({ item }: { item: SearchResultItem }) {
       <div className="mt-4 rounded-xl border-2 border-blue-300 bg-white p-4 text-blue-900">
         <p className="text-sm font-semibold">Lanjutkan Cek di Aplikasi Sentuh Tanahku</p>
         <p className="mt-2 text-xs uppercase tracking-wide text-blue-700">
-          Nomor Pendaftaran SK
+          Nomor Berkas
         </p>
         <p className="text-2xl font-bold">{item.officialFileNumber}</p>
         <p className="mt-2 text-sm">
           Silakan pantau kelanjutan berkas Anda di aplikasi Sentuh Tanahku
-          menggunakan Nomor Pendaftaran SK di atas.
+          menggunakan Nomor Berkas di atas.
         </p>
       </div>
       <Duration days={item.daysInProcess} label="" />

@@ -24,12 +24,18 @@ import {
   createSchedule,
   markApplicationComplete,
   reopenApplication,
+  rescheduleApplication,
   updateOfficialFileNumber,
   updateSchedule,
 } from "@/actions/schedule";
 import { addOfficer, deleteOfficer, reactivateOfficer } from "@/actions/officer";
 import type { ApplicationStatus } from "@/db/schema";
-import { getTodayWib } from "@/lib/utils";
+import {
+  type CancelCategory,
+  CANCEL_REASON_MIN,
+  CANCEL_REASON_MAX,
+  getTodayWib,
+} from "@/lib/utils";
 import ReceiptModal from "./ReceiptModal";
 
 export type AdminRow = {
@@ -49,7 +55,9 @@ export type AdminRow = {
   notes: string | null;
   officerIds: string[];
   officerNames: string[];
+  lastCancelCategory: CancelCategory | null;
   lastCancelReason: string | null;
+  rescheduleCount: number;
 };
 
 export type OfficerOption = { id: string; name: string; position: string };
@@ -70,7 +78,8 @@ const STATUS_STYLE: Record<ApplicationStatus, string> = {
 
 const AUDIT_ACTION_LABEL: Record<string, string> = {
   CANCEL_SCHEDULE: "Jadwal dibatalkan",
-  UPDATE_OFFICIAL_NUMBER: "Nomor Pendaftaran SK dikoreksi",
+  RESCHEDULE_APPLICATION: "Jadwal diatur ulang",
+  UPDATE_OFFICIAL_NUMBER: "Nomor Berkas dikoreksi",
   REOPEN_APPLICATION: "Berkas dibuka kembali",
   UPDATE_APPLICATION: "Data berkas diubah",
   DELETE_APPLICATION: "Berkas dihapus",
@@ -258,12 +267,18 @@ export default function AdminTable({
   const [village, setVillage] = useState("");
   const [streetDetail, setStreetDetail] = useState("");
 
-  // Form dokumen kurang / nomor pendaftaran SK
+  // Form dokumen kurang / nomor berkas
   const [docs, setDocs] = useState("");
   const [officialNumber, setOfficialNumber] = useState("");
 
-  // Form pembatalan jadwal / koreksi nomor pendaftaran SK
+  // Form pembatalan jadwal / jadwal ulang / koreksi nomor berkas
+  const [cancelCategory, setCancelCategory] = useState<CancelCategory | "">("");
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelFollowUp, setCancelFollowUp] = useState<"CANCEL" | "RESCHEDULE">("CANCEL");
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("09:00");
+  const [rescheduleNotes, setRescheduleNotes] = useState(DEFAULT_NOTES);
+  const [rescheduleOfficers, setRescheduleOfficers] = useState<string[]>([]);
   const [correctionNumber, setCorrectionNumber] = useState("");
 
   // Modal riwayat kunjungan & riwayat perubahan (audit logs)
@@ -316,6 +331,13 @@ export default function AdminTable({
     setDialog(null);
     setError(null);
     setOfficerError(null);
+    setCancelCategory("");
+    setCancelReason("");
+    setCancelFollowUp("CANCEL");
+    setRescheduleDate("");
+    setRescheduleTime("09:00");
+    setRescheduleNotes(DEFAULT_NOTES);
+    setRescheduleOfficers([]);
   }
 
   function openOfficers() {
@@ -455,9 +477,24 @@ export default function AdminTable({
   }
 
   function openCancelSchedule(row: AdminRow) {
+    setCancelCategory("");
     setCancelReason("");
+    setCancelFollowUp("CANCEL");
+    setRescheduleDate("");
+    setRescheduleTime(row.inspectionTime ?? "09:00");
+    setRescheduleNotes(row.notes ?? DEFAULT_NOTES);
+    const activeOldOfficerIds = row.officerIds.filter((id) =>
+      officerList.some((o) => o.id === id),
+    );
+    setRescheduleOfficers(activeOldOfficerIds);
     setError(null);
     setDialog({ kind: "cancelSchedule", row });
+  }
+
+  function toggleRescheduleOfficer(id: string) {
+    setRescheduleOfficers((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
   }
 
   function openCorrection(row: AdminRow) {
@@ -609,7 +646,7 @@ export default function AdminTable({
     e.preventDefault();
     if (dialog?.kind !== "complete") return;
     if (!officialNumber.trim()) {
-      return setError("Nomor Pendaftaran SK wajib diisi.");
+      return setError("Nomor Berkas wajib diisi.");
     }
     setError(null);
     run(() => markApplicationComplete(dialog.row.id, officialNumber));
@@ -618,21 +655,65 @@ export default function AdminTable({
   function submitCancelSchedule(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "cancelSchedule") return;
-    if (cancelReason.trim().length < 3) {
-      return setError("Alasan pembatalan minimal 3 karakter.");
+
+    if (!cancelCategory) {
+      return setError("Pilih kategori alasan terlebih dahulu.");
     }
+    const cleanReason = cancelReason.trim();
+    if (cleanReason.length < CANCEL_REASON_MIN) {
+      return setError(`Alasan wajib diisi minimal ${CANCEL_REASON_MIN} karakter.`);
+    }
+    if (cleanReason.length > CANCEL_REASON_MAX) {
+      return setError(`Alasan maksimal ${CANCEL_REASON_MAX} karakter.`);
+    }
+
+    if (cancelFollowUp === "CANCEL") {
+      setError(null);
+      run(() => cancelSchedule(dialog.row.id, cleanReason, cancelCategory));
+      return;
+    }
+
+    if (!rescheduleDate) {
+      return setError("Tanggal pemeriksaan baru wajib diisi.");
+    }
+    if (!rescheduleTime) {
+      return setError("Jam pemeriksaan baru wajib diisi.");
+    }
+    if (rescheduleDate < getTodayWib()) {
+      return setError("Tanggal pemeriksaan baru tidak boleh sebelum hari ini.");
+    }
+    if (
+      dialog.row.inspectionDate === rescheduleDate &&
+      dialog.row.inspectionTime === rescheduleTime
+    ) {
+      return setError("Tanggal dan jam baru sama dengan jadwal sebelumnya.");
+    }
+    if (rescheduleOfficers.length === 0) {
+      return setError("Pilih minimal satu petugas untuk jadwal baru.");
+    }
+
     setError(null);
-    run(() => cancelSchedule(dialog.row.id, cancelReason.trim()));
+    run(() =>
+      rescheduleApplication({
+        applicationId: dialog.row.id,
+        category: cancelCategory,
+        reason: cleanReason,
+        newDate: rescheduleDate,
+        newTime: rescheduleTime,
+        notes: rescheduleNotes,
+        officerIds: rescheduleOfficers,
+      }),
+    );
   }
 
   function submitCorrection(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "correction") return;
     if (!correctionNumber.trim()) {
-      return setError("Nomor Pendaftaran SK wajib diisi.");
+      return setError("Nomor Berkas wajib diisi.");
     }
     if (correctionNumber.trim().length > 50) {
-      return setError("Nomor Pendaftaran SK maksimal 50 karakter.");
+      return setError("Nomor Berkas maksimal 50 karakter.");
     }
     setError(null);
     run(() => updateOfficialFileNumber(dialog.row.id, correctionNumber.trim()));
@@ -790,7 +871,7 @@ export default function AdminTable({
       "Tanggal Jadwal",
       "Petugas Ukur",
       "Dokumen Kurang",
-      "Nomor Pendaftaran SK",
+      "Nomor Berkas",
     ];
 
     const csvRows = filteredRows.map((r) => [
@@ -1320,18 +1401,50 @@ export default function AdminTable({
                             Antrean petugas · {r.daysInStage} hari
                           </p>
                           {r.lastCancelReason && (
-                            <p
-                              title={r.lastCancelReason}
-                              className="mt-0.5 line-clamp-2 text-[11px] text-amber-700/80"
-                            >
-                              Jadwal sebelumnya dibatalkan: {r.lastCancelReason}
-                            </p>
+                            (() => {
+                              if (r.lastCancelCategory === "PEMOHON_ABSEN") {
+                                const fullText = `Pemohon tidak di lokasi: ${r.lastCancelReason} - hubungi pemohon untuk jadwal ulang`;
+                                return (
+                                  <p
+                                    title={fullText}
+                                    className="mt-1 line-clamp-2 rounded-md border border-rose-300 bg-rose-50 px-1.5 py-0.5 text-[11px] font-medium text-rose-800"
+                                  >
+                                    {fullText}
+                                  </p>
+                                );
+                              }
+                              if (r.lastCancelCategory === "PETUGAS_HALANGAN") {
+                                const fullText = `Petugas berhalangan: ${r.lastCancelReason}`;
+                                return (
+                                  <p
+                                    title={fullText}
+                                    className="mt-1 line-clamp-2 text-[11px] font-medium text-amber-800"
+                                  >
+                                    {fullText}
+                                  </p>
+                                );
+                              }
+                              const fullText = `Jadwal sebelumnya dibatalkan: ${r.lastCancelReason}`;
+                              return (
+                                <p
+                                  title={fullText}
+                                  className="mt-0.5 line-clamp-2 text-[11px] text-amber-700/80"
+                                >
+                                  {fullText}
+                                </p>
+                              );
+                            })()
                           )}
                         </>
                       )}
+                      {r.status === "DIJADWALKAN" && r.rescheduleCount > 0 && (
+                        <p className="mt-1 inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200/80">
+                          Dijadwal ulang {r.rescheduleCount}x
+                        </p>
+                      )}
                       {r.status === "SELESAI" && r.officialFileNumber && (
                         <p className="text-[11px] font-medium text-emerald-700">
-                          Nomor Pendaftaran SK: {r.officialFileNumber}
+                          No. Berkas: {r.officialFileNumber}
                         </p>
                       )}
                     </div>
@@ -1642,7 +1755,7 @@ export default function AdminTable({
                                       d="M6 18L18 6M6 6l12 12"
                                     />
                                   </svg>
-                                  <span>Batalkan Jadwal Pemeriksaan</span>
+                                  <span>Batalkan / Jadwalkan Ulang</span>
                                 </button>
                               </>
                             )}
@@ -1670,7 +1783,7 @@ export default function AdminTable({
                                       d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                                     />
                                   </svg>
-                                  <span>Koreksi Nomor Pendaftaran SK</span>
+                                  <span>Koreksi Nomor Berkas</span>
                                 </button>
                                 <button
                                   type="button"
@@ -2348,7 +2461,7 @@ export default function AdminTable({
                 htmlFor="official"
                 className="block text-sm font-medium text-gray-700"
               >
-                Nomor Pendaftaran SK
+                Nomor Berkas
               </label>
               <input
                 id="official"
@@ -2359,8 +2472,7 @@ export default function AdminTable({
                 className={inputCls}
               />
               <p className="mt-1 text-xs text-gray-500">
-                Nomor Pendaftaran SK dari aplikasi Sentuh Tanahku. Akan ditampilkan kepada
-                pemohon.
+                Nomor berkas dari BPN; pemohon dapat mengeceknya di aplikasi Sentuh Tanahku.
               </p>
             </div>
             <FormFooter
@@ -2373,54 +2485,300 @@ export default function AdminTable({
         </Modal>
       )}
 
-      {/* Modal: Batalkan Jadwal Pemeriksaan */}
+      {/* Modal: Batalkan / Jadwalkan Ulang */}
       {dialog?.kind === "cancelSchedule" && (
-        <Modal titleId="cancel-schedule-title">
+        <Modal titleId="cancel-schedule-title" maxWidth="max-w-xl">
           <form onSubmit={submitCancelSchedule} className="space-y-4">
             <div className="border-b border-gray-200 pb-3">
               <h2
                 id="cancel-schedule-title"
                 className="text-lg font-bold text-gray-900"
               >
-                Batalkan Jadwal - {dialog.row.ticketNumber}
+                Batalkan / Jadwalkan Ulang - {dialog.row.ticketNumber}
               </h2>
               <p className="mt-1 text-xs text-gray-600">
-                Jadwal pemeriksaan aktif akan dibatalkan dan status berkas dikembalikan ke{" "}
-                <strong>Verifikasi Petugas</strong>.
+                Pemohon: <strong>{dialog.row.applicantName}</strong> · Jadwal saat ini:{" "}
+                <strong>
+                  {dialog.row.inspectionDate
+                    ? `${formatIndoDate(dialog.row.inspectionDate)} ${dialog.row.inspectionTime ? `${dialog.row.inspectionTime} WIB` : ""}`
+                    : "-"}
+                </strong>
               </p>
+              <div className="mt-2.5 rounded-lg bg-slate-50 border border-slate-200 p-2.5 text-xs text-slate-600">
+                Gunakan menu ini bila pemeriksaan batal atau perlu dijadwalkan ulang; riwayatnya tersimpan. Untuk sekadar koreksi, gunakan Ubah Jadwal.
+              </div>
             </div>
+
+            {/* 1. Kategori Alasan */}
             <div>
-              <label
-                htmlFor="cancel-reason"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Alasan Pembatalan <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-700">
+                Kategori Alasan <span className="text-red-500">*</span>
               </label>
+              <div className="mt-2 space-y-2">
+                <label className="flex items-start gap-2.5 rounded-xl border border-gray-200 p-3 hover:bg-gray-50/80 cursor-pointer transition">
+                  <input
+                    type="radio"
+                    name="cancelCategory"
+                    value="PEMOHON_ABSEN"
+                    checked={cancelCategory === "PEMOHON_ABSEN"}
+                    onChange={() => setCancelCategory("PEMOHON_ABSEN")}
+                    className="mt-0.5 h-4 w-4 text-[#002B49] focus:ring-[#002B49]"
+                  />
+                  <div className="text-xs">
+                    <p className="font-semibold text-gray-900">
+                      Pemohon tidak di tempat saat petugas datang
+                    </p>
+                    <p className="mt-0.5 text-gray-500">
+                      Hubungi pemohon lewat telepon untuk menanyakan waktu yang cocok.
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2.5 rounded-xl border border-gray-200 p-3 hover:bg-gray-50/80 cursor-pointer transition">
+                  <input
+                    type="radio"
+                    name="cancelCategory"
+                    value="PETUGAS_HALANGAN"
+                    checked={cancelCategory === "PETUGAS_HALANGAN"}
+                    onChange={() => setCancelCategory("PETUGAS_HALANGAN")}
+                    className="mt-0.5 h-4 w-4 text-[#002B49] focus:ring-[#002B49]"
+                  />
+                  <div className="text-xs">
+                    <p className="font-semibold text-gray-900">
+                      Petugas berhalangan / kendala cuaca / kendala lapangan
+                    </p>
+                    <p className="mt-0.5 text-gray-500">
+                      Keterangan ini akan terlihat oleh pemohon di halaman cek jadwal.
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2.5 rounded-xl border border-gray-200 p-3 hover:bg-gray-50/80 cursor-pointer transition">
+                  <input
+                    type="radio"
+                    name="cancelCategory"
+                    value="LAINNYA"
+                    checked={cancelCategory === "LAINNYA"}
+                    onChange={() => setCancelCategory("LAINNYA")}
+                    className="mt-0.5 h-4 w-4 text-[#002B49] focus:ring-[#002B49]"
+                  />
+                  <div className="text-xs">
+                    <p className="font-semibold text-gray-900">
+                      Alasan lainnya
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* 2. Keterangan Alasan */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="cancel-reason"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Keterangan Alasan <span className="text-red-500">*</span>
+                </label>
+                <span
+                  className={`text-xs ${
+                    cancelReason.trim().length > CANCEL_REASON_MAX
+                      ? "text-red-600 font-semibold"
+                      : "text-gray-400"
+                  }`}
+                >
+                  {cancelReason.trim().length}/{CANCEL_REASON_MAX}
+                </span>
+              </div>
               <textarea
                 id="cancel-reason"
                 rows={3}
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Contoh: Pemohon berhalangan hadir / Perlu revisi patok batas"
+                placeholder={
+                  cancelCategory === "PEMOHON_ABSEN"
+                    ? "Contoh: Petugas telah tiba di lokasi, namun pemohon tidak berada di tempat dan belum dapat dihubungi."
+                    : cancelCategory === "PETUGAS_HALANGAN"
+                      ? "Contoh: Petugas berhalangan hadir karena kendala cuaca ekstrem / kendala akses jalan."
+                      : "Tuliskan alasan pembatalan / penjadwalan ulang..."
+                }
                 className={inputCls}
                 required
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Minimal 3 karakter. Alasan pembatalan ini akan dicatat ke dalam riwayat sistem.
-              </p>
+              {cancelCategory === "PETUGAS_HALANGAN" ? (
+                <p className="mt-1.5 text-xs text-amber-700 font-medium">
+                  ⚠️ Keterangan ini terlihat oleh pemohon. Tulis singkat dan sopan; jangan memuat data pribadi atau sengketa.
+                </p>
+              ) : (
+                <p className="mt-1.5 text-xs text-gray-500">
+                  🔒 Keterangan ini hanya terlihat oleh petugas.
+                </p>
+              )}
             </div>
+
+            {/* 3. Tindak Lanjut */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Tindak Lanjut <span className="text-red-500">*</span>
+              </label>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <label
+                  className={`flex items-center gap-2.5 rounded-xl border p-3 cursor-pointer transition text-xs ${
+                    cancelFollowUp === "CANCEL"
+                      ? "border-[#002B49] bg-blue-50/50 font-semibold text-gray-900"
+                      : "border-gray-200 hover:bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="cancelFollowUp"
+                    value="CANCEL"
+                    checked={cancelFollowUp === "CANCEL"}
+                    onChange={() => setCancelFollowUp("CANCEL")}
+                    className="h-4 w-4 text-[#002B49] focus:ring-[#002B49]"
+                  />
+                  <span>Kembalikan ke antrean verifikasi</span>
+                </label>
+
+                <label
+                  className={`flex items-center gap-2.5 rounded-xl border p-3 cursor-pointer transition text-xs ${
+                    cancelFollowUp === "RESCHEDULE"
+                      ? "border-[#002B49] bg-blue-50/50 font-semibold text-gray-900"
+                      : "border-gray-200 hover:bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="cancelFollowUp"
+                    value="RESCHEDULE"
+                    checked={cancelFollowUp === "RESCHEDULE"}
+                    onChange={() => setCancelFollowUp("RESCHEDULE")}
+                    className="h-4 w-4 text-[#002B49] focus:ring-[#002B49]"
+                  />
+                  <span>Tetapkan jadwal baru sekarang</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 4. Form Jadwal Baru (Jika Tetapkan Jadwal Baru Dipilih) */}
+            {cancelFollowUp === "RESCHEDULE" && (
+              <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/30 p-4">
+                <p className="text-xs font-bold text-gray-800 uppercase tracking-wide">
+                  Penetapan Jadwal Pemeriksaan Baru
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      htmlFor="reschedule-date"
+                      className="block text-xs font-semibold text-gray-700"
+                    >
+                      Tanggal Baru <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="reschedule-date"
+                      type="date"
+                      min={getTodayWib()}
+                      value={rescheduleDate}
+                      onChange={(e) => setRescheduleDate(e.target.value)}
+                      className={inputCls}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="reschedule-time"
+                      className="block text-xs font-semibold text-gray-700"
+                    >
+                      Jam (WIB) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="reschedule-time"
+                      type="time"
+                      value={rescheduleTime}
+                      onChange={(e) => setRescheduleTime(e.target.value)}
+                      className={inputCls}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="reschedule-notes"
+                    className="block text-xs font-semibold text-gray-700"
+                  >
+                    Catatan untuk Pemohon
+                  </label>
+                  <textarea
+                    id="reschedule-notes"
+                    rows={2}
+                    value={rescheduleNotes}
+                    onChange={(e) => setRescheduleNotes(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+
+                <fieldset>
+                  <legend className="text-xs font-semibold text-gray-700">
+                    Petugas Lapangan <span className="text-red-500">*</span>
+                  </legend>
+                  <div className="mt-1.5 space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {officerList.length === 0 ? (
+                      <p className="text-xs text-gray-500 italic py-1">
+                        Belum ada data petugas aktif. Silakan tambahkan melalui menu Kelola Petugas.
+                      </p>
+                    ) : (
+                      officerList.map((o) => (
+                        <label
+                          key={o.id}
+                          className="flex items-center gap-2 text-xs text-gray-900 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={rescheduleOfficers.includes(o.id)}
+                            onChange={() => toggleRescheduleOfficer(o.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-[#002B49] focus:ring-[#002B49]"
+                          />
+                          <span>
+                            {o.name}{" "}
+                            <span className="text-gray-500">({o.position})</span>
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </fieldset>
+              </div>
+            )}
+
             <FormFooter
               error={error}
               pending={pending}
-              disabled={pending || cancelReason.trim().length < 3}
-              submitLabel="Batalkan Jadwal"
+              disabled={
+                pending ||
+                !cancelCategory ||
+                cancelReason.trim().length < CANCEL_REASON_MIN ||
+                cancelReason.trim().length > CANCEL_REASON_MAX ||
+                (cancelFollowUp === "RESCHEDULE" &&
+                  (!rescheduleDate ||
+                    !rescheduleTime ||
+                    rescheduleOfficers.length === 0 ||
+                    rescheduleDate < getTodayWib() ||
+                    (dialog.row.inspectionDate === rescheduleDate &&
+                      dialog.row.inspectionTime === rescheduleTime)))
+              }
+              submitLabel={
+                cancelFollowUp === "RESCHEDULE"
+                  ? "Jadwalkan Ulang"
+                  : "Batalkan Jadwal"
+              }
               onCancel={close}
             />
           </form>
         </Modal>
       )}
 
-      {/* Modal: Koreksi Nomor Pendaftaran SK */}
+      {/* Modal: Koreksi Nomor Berkas */}
       {dialog?.kind === "correction" && (
         <Modal titleId="correction-title">
           <form onSubmit={submitCorrection} className="space-y-4">
@@ -2429,10 +2787,10 @@ export default function AdminTable({
                 id="correction-title"
                 className="text-lg font-bold text-gray-900"
               >
-                Koreksi Nomor Pendaftaran SK - {dialog.row.ticketNumber}
+                Koreksi Nomor Berkas - {dialog.row.ticketNumber}
               </h2>
               <p className="mt-1 text-xs text-gray-600">
-                Perbarui Nomor Pendaftaran SK BPN Sentuh Tanahku tanpa mengubah status atau tanggal penyelesaian berkas.
+                Perbarui Nomor Berkas BPN Sentuh Tanahku tanpa mengubah status atau tanggal penyelesaian berkas.
               </p>
             </div>
             <div>
@@ -2440,7 +2798,7 @@ export default function AdminTable({
                 htmlFor="correction-official"
                 className="block text-sm font-medium text-gray-700"
               >
-                Nomor Pendaftaran SK Baru <span className="text-red-500">*</span>
+                Nomor Berkas Baru <span className="text-red-500">*</span>
               </label>
               <input
                 id="correction-official"
@@ -2453,7 +2811,7 @@ export default function AdminTable({
                 required
               />
               <p className="mt-1 text-xs text-gray-500">
-                Maksimal 50 karakter. Nomor ini akan tampil saat pemohon melakukan pengecekan mandiri.
+                Maksimal 50 karakter. Nomor berkas dari BPN; pemohon dapat mengeceknya di aplikasi Sentuh Tanahku.
               </p>
             </div>
             <FormFooter
@@ -2501,7 +2859,7 @@ export default function AdminTable({
                   Bila jadwal lama tidak dapat dipulihkan (petugas nonaktif atau jadwal tidak ada), berkas kembali ke antrean <strong>Verifikasi Petugas</strong> dan perlu dijadwalkan ulang.
                 </li>
                 <li>
-                  Nomor Pendaftaran SK sebelumnya akan dikosongkan.
+                  Nomor Berkas sebelumnya akan dikosongkan.
                 </li>
               </ul>
             </div>

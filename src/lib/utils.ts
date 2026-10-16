@@ -134,3 +134,36 @@ export function getNowWibIso(date: Date = new Date()): string {
   const get = (type: string) => parts.find((p) => p.type === type)?.value || "00";
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}+07:00`;
 }
+
+export type CancelCategory = "PEMOHON_ABSEN" | "PETUGAS_HALANGAN" | "LAINNYA";
+
+export const CANCEL_CATEGORY_LABEL: Record<CancelCategory, string> = {
+  PEMOHON_ABSEN: "Pemohon tidak di lokasi",
+  PETUGAS_HALANGAN: "Petugas berhalangan",
+  LAINNYA: "Alasan lainnya",
+};
+
+export const CANCEL_REASON_MIN = 3;
+export const CANCEL_REASON_MAX = 200;
+
+export function encodeCancelReason(category: CancelCategory, reason: string): string {
+  return `[${category}] ${reason.trim()}`;
+}
+
+export function parseCancelReason(
+  raw: string | null | undefined,
+): { category: CancelCategory; reason: string } | null {
+  if (!raw || !raw.trim()) return null;
+  const match = raw.match(/^\[(PEMOHON_ABSEN|PETUGAS_HALANGAN|LAINNYA)\]\s*([\s\S]*)$/);
+  if (match) {
+    return {
+      category: match[1] as CancelCategory,
+      reason: match[2].trim(),
+    };
+  }
+  return {
+    category: "LAINNYA",
+    reason: raw.trim(),
+  };
+}
+

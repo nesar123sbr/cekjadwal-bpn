@@ -12,7 +12,15 @@ import {
   schedules,
 } from "@/db/schema";
 import { getSession } from "@/lib/session";
-import { getNowWibIso } from "@/lib/utils";
+import {
+  type CancelCategory,
+  CANCEL_CATEGORY_LABEL,
+  CANCEL_REASON_MIN,
+  CANCEL_REASON_MAX,
+  encodeCancelReason,
+  getNowWibIso,
+  getTodayWib,
+} from "@/lib/utils";
 
 export type CreateScheduleInput = {
   applicationId: string;
@@ -140,10 +148,10 @@ function validateOfficialFileNumber(
 ): { ok: true; value: string } | { ok: false; error: string } {
   const clean = (raw ?? "").trim();
   if (!clean) {
-    return { ok: false, error: "Nomor Pendaftaran SK wajib diisi." };
+    return { ok: false, error: "Nomor Berkas wajib diisi." };
   }
   if (clean.length > 50) {
-    return { ok: false, error: "Nomor Pendaftaran SK maksimal 50 karakter." };
+    return { ok: false, error: "Nomor Berkas maksimal 50 karakter." };
   }
   return { ok: true, value: clean };
 }
@@ -184,7 +192,7 @@ export async function markApplicationComplete(
       )
       .get();
     if (duplicate && duplicate.id !== applicationId) {
-      return { ok: false, error: "Nomor Pendaftaran SK sudah dipakai berkas lain." };
+      return { ok: false, error: "Nomor Berkas sudah dipakai berkas lain." };
     }
 
     const now = getNowWibIso();
@@ -323,6 +331,7 @@ export async function updateSchedule(
 export async function cancelSchedule(
   applicationId: string,
   reason: string,
+  category: CancelCategory = "LAINNYA",
 ): Promise<ScheduleActionResult> {
   try {
     const actor = await getSession();
@@ -331,10 +340,16 @@ export async function cancelSchedule(
     }
 
     const cleanReason = reason.trim();
-    if (!cleanReason || cleanReason.length < 3) {
+    if (!cleanReason || cleanReason.length < CANCEL_REASON_MIN) {
       return {
         ok: false,
-        error: "Alasan pembatalan wajib diisi minimal 3 karakter.",
+        error: `Alasan pembatalan wajib diisi minimal ${CANCEL_REASON_MIN} karakter.`,
+      };
+    }
+    if (cleanReason.length > CANCEL_REASON_MAX) {
+      return {
+        ok: false,
+        error: `Alasan pembatalan maksimal ${CANCEL_REASON_MAX} karakter.`,
       };
     }
 
@@ -368,13 +383,14 @@ export async function cancelSchedule(
       return { ok: false, error: "Jadwal aktif tidak ditemukan." };
     }
 
+    const encodedReason = encodeCancelReason(category, cleanReason);
     const now = getNowWibIso();
     await db.transaction(async (tx) => {
       await tx
         .update(schedules)
         .set({
           status: "DIBATALKAN",
-          cancel_reason: cleanReason,
+          cancel_reason: encodedReason,
         })
         .where(eq(schedules.id, activeSchedule.id));
 
@@ -392,7 +408,7 @@ export async function cancelSchedule(
         action: "CANCEL_SCHEDULE",
         actor,
         old_value: `${activeSchedule.inspection_date} ${activeSchedule.inspection_time}`,
-        new_value: cleanReason,
+        new_value: `${CANCEL_CATEGORY_LABEL[category]}: ${cleanReason}`,
         ip: null,
         created_at: now,
       });
@@ -405,6 +421,201 @@ export async function cancelSchedule(
     return {
       ok: false,
       error: "Terjadi kendala saat membatalkan jadwal pemeriksaan. Silakan coba lagi.",
+    };
+  }
+}
+
+export type RescheduleApplicationInput = {
+  applicationId: string;
+  category: CancelCategory;
+  reason: string;
+  newDate: string;
+  newTime: string;
+  notes: string;
+  officerIds: string[];
+};
+
+export async function rescheduleApplication(
+  input: RescheduleApplicationInput,
+): Promise<ScheduleActionResult> {
+  try {
+    const actor = await getSession();
+    if (!actor) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
+    }
+
+    const { applicationId, category, newDate, newTime } = input;
+    const cleanReason = (input.reason ?? "").trim();
+    const notes = (input.notes ?? "").trim();
+    const officerIds = [...new Set(input.officerIds)];
+
+    if (!cleanReason || cleanReason.length < CANCEL_REASON_MIN) {
+      return {
+        ok: false,
+        error: `Alasan pembatalan wajib diisi minimal ${CANCEL_REASON_MIN} karakter.`,
+      };
+    }
+    if (cleanReason.length > CANCEL_REASON_MAX) {
+      return {
+        ok: false,
+        error: `Alasan pembatalan maksimal ${CANCEL_REASON_MAX} karakter.`,
+      };
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+      return { ok: false, error: "Tanggal pemeriksaan tidak valid." };
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(newTime)) {
+      return { ok: false, error: "Jam pemeriksaan tidak valid." };
+    }
+
+    const todayWib = getTodayWib();
+    if (newDate < todayWib) {
+      return {
+        ok: false,
+        error: "Tanggal pemeriksaan baru tidak boleh sebelum hari ini.",
+      };
+    }
+
+    if (officerIds.length === 0) {
+      return { ok: false, error: "Pilih minimal satu petugas." };
+    }
+
+    const app = await db
+      .select()
+      .from(applications)
+      .where(
+        and(eq(applications.id, applicationId), isNull(applications.deleted_at)),
+      )
+      .get();
+    if (!app) return { ok: false, error: "Berkas tidak ditemukan." };
+    if (app.status !== "DIJADWALKAN") {
+      return {
+        ok: false,
+        error: "Hanya berkas berstatus Dijadwalkan yang dapat dijadwalkan ulang.",
+      };
+    }
+
+    const activeSchedule = await db
+      .select()
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.application_id, applicationId),
+          eq(schedules.status, "AKTIF"),
+        ),
+      )
+      .get();
+    if (!activeSchedule) {
+      return { ok: false, error: "Jadwal aktif tidak ditemukan." };
+    }
+
+    if (
+      activeSchedule.inspection_date === newDate &&
+      activeSchedule.inspection_time === newTime
+    ) {
+      return {
+        ok: false,
+        error: "Tanggal dan jam baru sama dengan jadwal sebelumnya.",
+      };
+    }
+
+    const found = await db
+      .select({ id: officers.id })
+      .from(officers)
+      .where(and(inArray(officers.id, officerIds), isNull(officers.deleted_at)));
+    if (found.length !== officerIds.length) {
+      return { ok: false, error: "Petugas tidak valid." };
+    }
+
+    const conflict = await db
+      .select({
+        officerName: officers.name,
+      })
+      .from(schedule_officers)
+      .innerJoin(schedules, eq(schedule_officers.schedule_id, schedules.id))
+      .innerJoin(officers, eq(schedule_officers.officer_id, officers.id))
+      .where(
+        and(
+          inArray(schedule_officers.officer_id, officerIds),
+          eq(schedules.inspection_date, newDate),
+          eq(schedules.inspection_time, newTime),
+          eq(schedules.status, "AKTIF"),
+          ne(schedules.id, activeSchedule.id),
+        ),
+      )
+      .get();
+
+    if (conflict) {
+      return {
+        ok: false,
+        error: `Jadwal bentrok: Petugas ${conflict.officerName} sudah memiliki jadwal pemeriksaan lain pada tanggal dan jam tersebut.`,
+      };
+    }
+
+    const newScheduleId = randomUUID();
+    const encodedReason = encodeCancelReason(category, cleanReason);
+    const now = getNowWibIso();
+
+    await db.transaction(async (tx) => {
+      // (1) jadwal lama -> status DIBATALKAN dan cancel_reason = encodeCancelReason(category, reason)
+      await tx
+        .update(schedules)
+        .set({
+          status: "DIBATALKAN",
+          cancel_reason: encodedReason,
+        })
+        .where(eq(schedules.id, activeSchedule.id));
+
+      // (2) insert jadwal baru status AKTIF
+      await tx.insert(schedules).values({
+        id: newScheduleId,
+        application_id: applicationId,
+        inspection_date: newDate,
+        inspection_time: newTime,
+        status: "AKTIF",
+        notes_for_public: notes || null,
+      });
+
+      // (3) insert schedule_officers (petugas pertama "Ketua Tim", lainnya "Anggota")
+      await tx.insert(schedule_officers).values(
+        officerIds.map((officerId, i) => ({
+          id: randomUUID(),
+          schedule_id: newScheduleId,
+          officer_id: officerId,
+          role_in_team: i === 0 ? "Ketua Tim" : "Anggota",
+        })),
+      );
+
+      // (4) update berkas: status DIJADWALKAN dan status_updated_at = getNowWibIso()
+      await tx
+        .update(applications)
+        .set({
+          status: "DIJADWALKAN",
+          status_updated_at: now,
+        })
+        .where(eq(applications.id, applicationId));
+
+      // (5) insert audit_logs: action "RESCHEDULE_APPLICATION", actor, old_value "tanggal jam lama", new_value `tanggal jam baru | ${CANCEL_CATEGORY_LABEL[category]}: ${reason}`
+      await tx.insert(audit_logs).values({
+        id: randomUUID(),
+        application_id: applicationId,
+        action: "RESCHEDULE_APPLICATION",
+        actor,
+        old_value: `${activeSchedule.inspection_date} ${activeSchedule.inspection_time}`,
+        new_value: `${newDate} ${newTime} | ${CANCEL_CATEGORY_LABEL[category]}: ${cleanReason}`,
+        ip: null,
+        created_at: now,
+      });
+    });
+
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (err) {
+    console.error("rescheduleApplication error:", err);
+    return {
+      ok: false,
+      error: "Terjadi kendala saat menjadwalkan ulang pemeriksaan. Silakan coba lagi.",
     };
   }
 }
@@ -437,7 +648,7 @@ export async function updateOfficialFileNumber(
       return {
         ok: false,
         error:
-          "Hanya berkas berstatus Selesai yang dapat diubah Nomor Pendaftaran SK-nya.",
+          "Hanya berkas berstatus Selesai yang dapat diubah Nomor Berkas-nya.",
       };
     }
 
@@ -457,7 +668,7 @@ export async function updateOfficialFileNumber(
       )
       .get();
     if (duplicate && duplicate.id !== applicationId) {
-      return { ok: false, error: "Nomor Pendaftaran SK sudah dipakai berkas lain." };
+      return { ok: false, error: "Nomor Berkas sudah dipakai berkas lain." };
     }
 
     const now = getNowWibIso();
@@ -485,7 +696,7 @@ export async function updateOfficialFileNumber(
     console.error("updateOfficialFileNumber error:", err);
     return {
       ok: false,
-      error: "Terjadi kendala saat mengoreksi Nomor Pendaftaran SK. Silakan coba lagi.",
+      error: "Terjadi kendala saat mengoreksi Nomor Berkas. Silakan coba lagi.",
     };
   }
 }

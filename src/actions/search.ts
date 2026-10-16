@@ -7,7 +7,13 @@ import {
   applications,
   schedules,
 } from "@/db/schema";
-import { daysBetween, normalizeNameForMatch, normalizeTicketNumber } from "@/lib/utils";
+import {
+  type CancelCategory,
+  daysBetween,
+  normalizeNameForMatch,
+  normalizeTicketNumber,
+  parseCancelReason,
+} from "@/lib/utils";
 import { maskAddress, maskName } from "@/lib/masking";
 
 type Base = {
@@ -33,6 +39,8 @@ export type SearchResultItem =
       /** Hari berkas menunggu jadwal dari petugas. */
       daysWaiting: number;
       previouslyCancelled: boolean;
+      cancelCategory: CancelCategory | null;
+      cancelPublicNote: string | null;
     })
   | (Base & {
       status: "DIJADWALKAN";
@@ -40,6 +48,9 @@ export type SearchResultItem =
       inspectionTime: string;
       notes: string | null;
       officers: { name: string; position: string; role: string | null }[];
+      isRescheduled: boolean;
+      cancelCategory: CancelCategory | null;
+      cancelPublicNote: string | null;
     })
   | (Base & {
       status: "SELESAI";
@@ -118,7 +129,10 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
 
     // Ambil riwayat jadwal yang dibatalkan dengan cancel_reason terisi
     const cancelledSchedules = await db
-      .select({ applicationId: schedules.application_id })
+      .select({
+        applicationId: schedules.application_id,
+        cancelReason: schedules.cancel_reason,
+      })
       .from(schedules)
       .where(
         and(
@@ -126,8 +140,25 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
           eq(schedules.status, "DIBATALKAN"),
           isNotNull(schedules.cancel_reason),
         ),
-      );
-    const cancelledAppIds = new Set(cancelledSchedules.map((s) => s.applicationId));
+      )
+      .orderBy(desc(schedules.inspection_date), desc(schedules.inspection_time));
+
+    const cancelledMap = new Map<
+      string,
+      { category: CancelCategory; publicNote: string | null }
+    >();
+    for (const cs of cancelledSchedules) {
+      if (!cancelledMap.has(cs.applicationId)) {
+        const parsed = parseCancelReason(cs.cancelReason);
+        if (parsed) {
+          cancelledMap.set(cs.applicationId, {
+            category: parsed.category,
+            publicNote:
+              parsed.category === "PETUGAS_HALANGAN" ? parsed.reason : null,
+          });
+        }
+      }
+    }
 
     const items: SearchResultItem[] = validApps.map((app) => {
       const stageEnd =
@@ -167,12 +198,16 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
           ? activeSchedules.find((s) => s.application_id === app.id)
           : undefined;
 
+      const cancelInfo = cancelledMap.get(app.id);
+
       if (!schedule) {
         return {
           ...base,
           status: "MENUNGGU_JADWAL",
           daysWaiting: daysInStage,
-          previouslyCancelled: cancelledAppIds.has(app.id),
+          previouslyCancelled: !!cancelInfo,
+          cancelCategory: cancelInfo?.category ?? null,
+          cancelPublicNote: cancelInfo?.publicNote ?? null,
         };
       }
 
@@ -183,6 +218,9 @@ export async function searchTicket(input: SearchInput): Promise<SearchResult> {
         inspectionTime: schedule.inspection_time,
         notes: schedule.notes_for_public,
         officers: [],
+        isRescheduled: !!cancelInfo,
+        cancelCategory: cancelInfo?.category ?? null,
+        cancelPublicNote: cancelInfo?.publicNote ?? null,
       };
     });
 

@@ -40,7 +40,7 @@ export default async function Home({
               Cek Jadwal Pemeriksaan Tanah Anda
             </h1>
             <p className="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
-              Pantau progres verifikasi berkas dan jadwal pengukuran lapangan sebelum Nomor Pendaftaran SK terbit.
+              Pantau progres verifikasi berkas dan jadwal pengukuran lapangan sebelum Nomor Berkas terbit di aplikasi Sentuh Tanahku.
             </p>
           </div>
 

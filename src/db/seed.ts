@@ -84,7 +84,7 @@ async function seed() {
       status_updated_at: daysAgo(2),
     },
     {
-      // Skenario 3: selesai, sudah ber-nomor pendaftaran SK
+      // Skenario 3: selesai, sudah ber-nomor berkas
       id: "app-1203",
       ticket_number: "REG-1203/2026",
       applicant_name: "Christine Natalia",

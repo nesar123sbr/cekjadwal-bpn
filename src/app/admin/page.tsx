@@ -13,7 +13,7 @@ import {
   schedules,
 } from "@/db/schema";
 import { getSession } from "@/lib/session";
-import { daysBetween } from "@/lib/utils";
+import { type CancelCategory, daysBetween, parseCancelReason } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -82,10 +82,24 @@ export default async function AdminPage() {
       ),
   ]);
 
-  const cancelReasonByApp = new Map<string, string>();
+  const cancelInfoByApp = new Map<
+    string,
+    { category: CancelCategory; reason: string }
+  >();
+  const rescheduleCountByApp = new Map<string, number>();
+
   for (const cs of cancelledSchedules) {
-    if (cs.cancelReason && !cancelReasonByApp.has(cs.applicationId)) {
-      cancelReasonByApp.set(cs.applicationId, cs.cancelReason);
+    if (cs.cancelReason) {
+      rescheduleCountByApp.set(
+        cs.applicationId,
+        (rescheduleCountByApp.get(cs.applicationId) ?? 0) + 1,
+      );
+      if (!cancelInfoByApp.has(cs.applicationId)) {
+        const parsed = parseCancelReason(cs.cancelReason);
+        if (parsed) {
+          cancelInfoByApp.set(cs.applicationId, parsed);
+        }
+      }
     }
   }
 
@@ -94,6 +108,10 @@ export default async function AdminPage() {
     const appVisits = allVisits.filter((v) => v.application_id === a.id);
     const firstVisitDate =
       appVisits[0]?.visit_date ?? a.created_at.slice(0, 10);
+    const cancelInfo =
+      a.status === "VERIFIKASI_PETUGAS"
+        ? (cancelInfoByApp.get(a.id) ?? null)
+        : null;
 
     return {
       id: a.id,
@@ -119,10 +137,9 @@ export default async function AdminPage() {
       officerNames: sch
         ? team.filter((t) => t.scheduleId === sch.id).map((t) => t.name)
         : [],
-      lastCancelReason:
-        a.status === "VERIFIKASI_PETUGAS"
-          ? (cancelReasonByApp.get(a.id) ?? null)
-          : null,
+      lastCancelCategory: cancelInfo?.category ?? null,
+      lastCancelReason: cancelInfo?.reason ?? null,
+      rescheduleCount: rescheduleCountByApp.get(a.id) ?? 0,
     };
   });
 
