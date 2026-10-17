@@ -77,8 +77,12 @@ const STATUS_STYLE: Record<ApplicationStatus, string> = {
 };
 
 const AUDIT_ACTION_LABEL: Record<string, string> = {
+  CREATE_APPLICATION: "Berkas didaftarkan",
+  CREATE_SCHEDULE: "Jadwal ditetapkan",
+  UPDATE_SCHEDULE: "Jadwal diubah",
   CANCEL_SCHEDULE: "Jadwal dibatalkan",
   RESCHEDULE_APPLICATION: "Jadwal diatur ulang",
+  COMPLETE_APPLICATION: "Berkas diselesaikan",
   UPDATE_OFFICIAL_NUMBER: "Nomor Berkas dikoreksi",
   REOPEN_APPLICATION: "Berkas dibuka kembali",
   UPDATE_APPLICATION: "Data berkas diubah",

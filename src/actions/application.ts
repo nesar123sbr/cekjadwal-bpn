@@ -59,8 +59,9 @@ export async function createApplication(
   input: CreateApplicationInput,
 ): Promise<CreateApplicationResult> {
   try {
-    if (!(await getSession())) {
-      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    const actor = await getSession();
+    if (!actor) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
     const ticketNumber = input.ticketNumber.trim();
@@ -96,6 +97,17 @@ export async function createApplication(
         application_id: id,
         visit_date: todayDate,
         notes: "Pendaftaran Berkas Awal",
+        created_at: now,
+      });
+
+      await tx.insert(audit_logs).values({
+        id: randomUUID(),
+        application_id: id,
+        action: "CREATE_APPLICATION",
+        actor,
+        old_value: null,
+        new_value: `${ticketNumber} | ${applicantName}`,
+        ip: null,
         created_at: now,
       });
     });

@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CekJadwal BPN - Kantor Pertanahan Kabupaten Dairi
 
-## Getting Started
+Sistem Pemantauan Pra-Berkas & Verifikasi Lapangan untuk Kantor Pertanahan Kabupaten Dairi. Aplikasi ini memungkinkan masyarakat pemohon memeriksa progres berkas dan jadwal pemeriksaan tanah secara mandiri melalui nomor tiket, serta menyediakan dashboard internal bagi petugas loket untuk mengelola antrean berkas, penugasan petugas, pembatalan & jadwal ulang, dan verifikasi lapangan.
 
-First, run the development server:
+---
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router, Turbopack, Server Actions)
+- **Bahasa**: TypeScript
+- **Styling**: Tailwind CSS v4
+- **Database & ORM**: Turso (libSQL) & Drizzle ORM
+- **Autentikasi**: Cookie-based Session (Iron-session / Signed Cookies)
+
+---
+
+## Perintah Kerja (Scripts)
+
+| Perintah | Deskripsi |
+| :--- | :--- |
+| `npm run dev` | Menjalankan server pengembangan lokal di `http://localhost:3000`. |
+| `npm run build` | Menjalankan proses kompilasi dan optimasi build produksi Next.js. |
+| `npm run lint` | Menjalankan linter ESLint untuk memeriksa kebersihan kode. |
+| `npx tsc --noEmit` | Memeriksa validitas tipe TypeScript di seluruh proyek tanpa menghasilkan berkas output. |
+| `npx drizzle-kit push` | Menerapkan (push) skema dari `src/db/schema.ts` ke database target. **Peringatan**: Pastikan `.env` mengarah ke database yang sesuai sebelum menjalankan perintah ini. |
+| `npm run seed` *(atau `npx tsx src/db/seed.ts`)* | Mengisi data awal/sampel untuk pengujian lokal. **Peringatan Keras**: Hanya boleh dijalankan di environment lokal pengembangan dengan `ALLOW_SEED=true`. Dilarang keras dijalankan pada database production. |
+
+---
+
+## Environment Variables
+
+Salin berkas `.env.example` menjadi `.env` lalu sesuaikan nilainya:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Variabel | Keterangan | Wajib / Opsional |
+| :--- | :--- | :---: |
+| `TURSO_DATABASE_URL` | URL koneksi database Turso / libSQL (misal `libsql://...` atau `file:local.db`). | **Wajib** |
+| `TURSO_AUTH_TOKEN` | Auth token untuk autentikasi ke database Turso. | **Wajib** (pada remote Turso) |
+| `ADMIN_USERNAME` | Username akun petugas loket pertama untuk akses dashboard. | **Wajib** |
+| `ADMIN_PASSWORD` | Password akun petugas loket pertama. | **Wajib** |
+| `ADMIN_USERNAME_2` | Username akun petugas loket kedua (jika ada). | Opsional *(keduanya harus diisi bersama `ADMIN_PASSWORD_2`)* |
+| `ADMIN_PASSWORD_2` | Password akun petugas loket kedua. | Opsional |
+| `SESSION_SECRET` | Kunci rahasia enkripsi sesi cookie. Wajib string acak minimal 32 karakter pada production. | **Wajib** (Production) |
+| `ALLOW_SEED` | Flag proteksi eksekusi seed database. Hanya bernilai `true` saat pengujian data lokal. | Opsional (Default: `false`) |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Prosedur Deployment ke Production
 
-## Learn More
+Untuk memastikan integritas aplikasi dan skema database, ikuti urutan deploy berikut:
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Konfigurasi Environment Variables**:
+   Daftarkan seluruh environment variable yang dibutuhkan (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `SESSION_SECRET`, dst.) pada platform hosting (misal Vercel / Cloud Provider).
+2. **Push Skema Database Terlebih Dahulu**:
+   Pastikan skema database sudah ter-update dengan menjalankan migrasi atau `npx drizzle-kit push` ke database production sebelum kode baru aktif.
+3. **Deploy & Build Kode Aplikasi**:
+   Jalankan deployment aplikasi (`npm run build`) setelah database siap menerima relasi dan kolom data terbaru.

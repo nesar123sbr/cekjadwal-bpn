@@ -20,6 +20,7 @@ import {
   encodeCancelReason,
   getNowWibIso,
   getTodayWib,
+  isCancelCategory,
 } from "@/lib/utils";
 
 export type CreateScheduleInput = {
@@ -36,7 +37,8 @@ export async function createSchedule(
   input: CreateScheduleInput,
 ): Promise<CreateScheduleResult> {
   try {
-    if (!(await getSession())) {
+    const actor = await getSession();
+    if (!actor) {
       return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
     }
 
@@ -49,6 +51,12 @@ export async function createSchedule(
     }
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(inspectionTime)) {
       return { ok: false, error: "Jam pemeriksaan tidak valid." };
+    }
+    if (inspectionDate < getTodayWib()) {
+      return {
+        ok: false,
+        error: "Tanggal pemeriksaan tidak boleh sebelum hari ini.",
+      };
     }
     if (officerIds.length === 0) {
       return { ok: false, error: "Pilih minimal satu petugas." };
@@ -128,6 +136,17 @@ export async function createSchedule(
           status_updated_at: now,
         })
         .where(eq(applications.id, applicationId));
+
+      await tx.insert(audit_logs).values({
+        id: randomUUID(),
+        application_id: applicationId,
+        action: "CREATE_SCHEDULE",
+        actor,
+        old_value: null,
+        new_value: `${inspectionDate} ${inspectionTime}`,
+        ip: null,
+        created_at: now,
+      });
     });
 
     revalidatePath("/admin");
@@ -161,8 +180,9 @@ export async function markApplicationComplete(
   officialFileNumber: string,
 ): Promise<ScheduleActionResult> {
   try {
-    if (!(await getSession())) {
-      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    const actor = await getSession();
+    if (!actor) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
     const app = await db
@@ -214,6 +234,17 @@ export async function markApplicationComplete(
           status_updated_at: now,
         })
         .where(eq(applications.id, applicationId));
+
+      await tx.insert(audit_logs).values({
+        id: randomUUID(),
+        application_id: applicationId,
+        action: "COMPLETE_APPLICATION",
+        actor,
+        old_value: null,
+        new_value: official,
+        ip: null,
+        created_at: now,
+      });
     });
 
     revalidatePath("/admin");
@@ -232,8 +263,9 @@ export async function updateSchedule(
   input: CreateScheduleInput,
 ): Promise<ScheduleActionResult> {
   try {
-    if (!(await getSession())) {
-      return { ok: false, error: "Sesi berakhir. Silakan login kembali." };
+    const actor = await getSession();
+    if (!actor) {
+      return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
     const { applicationId, inspectionDate, inspectionTime } = input;
@@ -261,6 +293,22 @@ export async function updateSchedule(
       )
       .get();
     if (!schedule) return { ok: false, error: "Jadwal aktif tidak ditemukan." };
+
+    if (
+      inspectionDate !== schedule.inspection_date &&
+      inspectionDate < getTodayWib()
+    ) {
+      return {
+        ok: false,
+        error: "Tanggal pemeriksaan tidak boleh sebelum hari ini.",
+      };
+    }
+
+    const oldOfficerRows = await db
+      .select({ officer_id: schedule_officers.officer_id })
+      .from(schedule_officers)
+      .where(eq(schedule_officers.schedule_id, schedule.id));
+    const oldOfficerIds = oldOfficerRows.map((r) => r.officer_id);
 
     const found = await db
       .select({ id: officers.id })
@@ -295,6 +343,15 @@ export async function updateSchedule(
       };
     }
 
+    const dateTimeChanged =
+      schedule.inspection_date !== inspectionDate ||
+      schedule.inspection_time !== inspectionTime;
+    const officersChanged =
+      oldOfficerIds.length !== officerIds.length ||
+      oldOfficerIds.some((id, idx) => id !== officerIds[idx]);
+    const isChanged = dateTimeChanged || officersChanged;
+
+    const now = getNowWibIso();
     await db.transaction(async (tx) => {
       await tx
         .update(schedules)
@@ -315,6 +372,21 @@ export async function updateSchedule(
           role_in_team: i === 0 ? "Ketua Tim" : "Anggota",
         })),
       );
+
+      if (isChanged) {
+        await tx.insert(audit_logs).values({
+          id: randomUUID(),
+          application_id: applicationId,
+          action: "UPDATE_SCHEDULE",
+          actor,
+          old_value: `${schedule.inspection_date} ${schedule.inspection_time}`,
+          new_value: `${inspectionDate} ${inspectionTime}${
+            officersChanged ? " | petugas diganti" : ""
+          }`,
+          ip: null,
+          created_at: now,
+        });
+      }
     });
 
     revalidatePath("/admin");
@@ -337,6 +409,10 @@ export async function cancelSchedule(
     const actor = await getSession();
     if (!actor) {
       return { ok: false, error: "Sesi telah berakhir. Silakan login kembali." };
+    }
+
+    if (!isCancelCategory(category)) {
+      return { ok: false, error: "Kategori pembatalan tidak valid." };
     }
 
     const cleanReason = reason.trim();
@@ -445,6 +521,9 @@ export async function rescheduleApplication(
     }
 
     const { applicationId, category, newDate, newTime } = input;
+    if (!isCancelCategory(category)) {
+      return { ok: false, error: "Kategori pembatalan tidak valid." };
+    }
     const cleanReason = (input.reason ?? "").trim();
     const notes = (input.notes ?? "").trim();
     const officerIds = [...new Set(input.officerIds)];

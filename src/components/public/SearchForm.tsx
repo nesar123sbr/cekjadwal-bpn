@@ -14,7 +14,11 @@ const MIN_NAME = 3;
 const inputCls =
   "w-full rounded-xl border border-gray-300 bg-white px-4 py-4 text-lg text-gray-900 shadow-sm outline-none placeholder:text-gray-400 focus:border-[#002B49] focus:ring-2 focus:ring-[#D4AF37]/50";
 
-export default function SearchForm({ onResult, initialTicket, initialName }: Props) {
+export default function SearchForm({
+  onResult,
+  initialTicket,
+  initialName,
+}: Props) {
   const [ticket, setTicket] = useState(initialTicket ?? "");
   const [name, setName] = useState(initialName ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +66,10 @@ export default function SearchForm({ onResult, initialTicket, initialName }: Pro
   return (
     <form onSubmit={handleSubmit} className="w-full space-y-4" noValidate>
       <div>
-        <label htmlFor="ticket" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="ticket"
+          className="block text-sm font-medium text-gray-700"
+        >
           Nomor Tiket / Registrasi
         </label>
         <input
@@ -80,7 +87,10 @@ export default function SearchForm({ onResult, initialTicket, initialName }: Pro
         />
       </div>
       <div>
-        <label htmlFor="applicant" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="applicant"
+          className="block text-sm font-medium text-gray-700"
+        >
           Nama Pemohon
         </label>
         <input
@@ -108,7 +118,7 @@ export default function SearchForm({ onResult, initialTicket, initialName }: Pro
         disabled={loading}
         className="w-full rounded-xl bg-[#002B49] px-4 py-4 text-lg font-semibold text-white shadow-sm transition hover:bg-[#003d66] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Mencari..." : "Cek Status Berkas"}
+        {loading ? "Mencari..." : "Cek Berkas"}
       </button>
     </form>
   );

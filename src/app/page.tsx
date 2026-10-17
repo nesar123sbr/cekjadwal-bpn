@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import BrandHeader from "@/components/BrandHeader";
 import PublicSearch from "@/components/public/PublicSearch";
@@ -7,6 +8,27 @@ type SearchParams = Record<string, string | string[] | undefined>;
 
 function first(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
+}
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  const ticket = first(params.ticket);
+  const name = first(params.name);
+
+  if (ticket || name) {
+    return {
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  return {};
 }
 
 export default async function Home({

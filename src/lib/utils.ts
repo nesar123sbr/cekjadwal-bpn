@@ -143,6 +143,14 @@ export const CANCEL_CATEGORY_LABEL: Record<CancelCategory, string> = {
   LAINNYA: "Alasan lainnya",
 };
 
+export function isCancelCategory(value: unknown): value is CancelCategory {
+  return (
+    value === "PEMOHON_ABSEN" ||
+    value === "PETUGAS_HALANGAN" ||
+    value === "LAINNYA"
+  );
+}
+
 export const CANCEL_REASON_MIN = 3;
 export const CANCEL_REASON_MAX = 200;
 
