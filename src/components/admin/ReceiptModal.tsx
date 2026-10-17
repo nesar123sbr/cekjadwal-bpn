@@ -64,7 +64,7 @@ export default function ReceiptModal({
                 alt="Logo ATR/BPN"
                 width={48}
                 height={48}
-                priority
+                preload
                 className="h-12 w-12 object-contain"
               />
             </div>

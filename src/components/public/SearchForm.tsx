@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type SubmitEvent } from "react";
 import { searchTicket, type SearchResult } from "@/actions/search";
 
 type Props = {
@@ -58,7 +58,7 @@ export default function SearchForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     void run(ticket, name);
   }

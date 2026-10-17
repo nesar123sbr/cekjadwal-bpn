@@ -53,7 +53,7 @@ export default function BrandHeader({
           alt="Logo ATR/BPN"
           width={52}
           height={52}
-          priority
+          preload
           className="h-12 w-12 sm:h-[52px] sm:w-[52px] shrink-0 object-contain drop-shadow-sm"
         />
         <div className="min-w-0 flex-1">
@@ -66,7 +66,7 @@ export default function BrandHeader({
         </div>
         {children}
       </div>
-      <div className="relative z-10 h-1 bg-gradient-to-r from-[#D4AF37] via-[#F1D77A] to-[#D4AF37]" />
+      <div className="relative z-10 h-1 bg-linear-to-r from-[#D4AF37] via-[#F1D77A] to-[#D4AF37]" />
     </header>
   );
 }

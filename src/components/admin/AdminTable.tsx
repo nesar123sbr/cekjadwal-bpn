@@ -5,7 +5,7 @@ import {
   useMemo,
   useState,
   useTransition,
-  type FormEvent,
+  type SubmitEvent,
 } from "react";
 import {
   addVisitLog,
@@ -351,7 +351,7 @@ export default function AdminTable({
     setDialog({ kind: "officers" });
   }
 
-  async function handleAddOfficer(e: FormEvent<HTMLFormElement>) {
+  async function handleAddOfficer(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!officerNameInput.trim() || !officerPositionInput.trim()) {
       setOfficerError("Nama dan jabatan petugas wajib diisi.");
@@ -552,7 +552,7 @@ export default function AdminTable({
     });
   }
 
-  function submitSchedule(e: FormEvent<HTMLFormElement>) {
+  function submitSchedule(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "schedule") return;
     if (!date) return setError("Tanggal pemeriksaan wajib diisi.");
@@ -572,7 +572,7 @@ export default function AdminTable({
     );
   }
 
-  function submitNew(e: FormEvent<HTMLFormElement>) {
+  function submitNew(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!ticketNumber.trim()) {
       return setError("No. Tiket / Registrasi wajib diisi.");
@@ -605,7 +605,7 @@ export default function AdminTable({
     });
   }
 
-  function submitEdit(e: FormEvent<HTMLFormElement>) {
+  function submitEdit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "edit") return;
     if (!ticketNumber.trim()) {
@@ -639,14 +639,14 @@ export default function AdminTable({
     run(() => deleteApplication(dialog.row.id));
   }
 
-  function submitDocs(e: FormEvent<HTMLFormElement>) {
+  function submitDocs(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "docs") return;
     setError(null);
     run(() => updateMissingDocs(dialog.row.id, docs));
   }
 
-  function submitComplete(e: FormEvent<HTMLFormElement>) {
+  function submitComplete(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "complete") return;
     if (!officialNumber.trim()) {
@@ -656,7 +656,7 @@ export default function AdminTable({
     run(() => markApplicationComplete(dialog.row.id, officialNumber));
   }
 
-  function submitCancelSchedule(e: FormEvent<HTMLFormElement>) {
+  function submitCancelSchedule(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "cancelSchedule") return;
 
@@ -710,7 +710,7 @@ export default function AdminTable({
     );
   }
 
-  function submitCorrection(e: FormEvent<HTMLFormElement>) {
+  function submitCorrection(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "correction") return;
     if (!correctionNumber.trim()) {
@@ -723,14 +723,14 @@ export default function AdminTable({
     run(() => updateOfficialFileNumber(dialog.row.id, correctionNumber.trim()));
   }
 
-  function submitReopen(e: FormEvent<HTMLFormElement>) {
+  function submitReopen(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "reopen") return;
     setError(null);
     run(() => reopenApplication(dialog.row.id));
   }
 
-  async function submitAddVisit(e: FormEvent<HTMLFormElement>) {
+  async function submitAddVisit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (dialog?.kind !== "history") return;
     if (!visitDateInput.trim()) {
