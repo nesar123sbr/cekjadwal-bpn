@@ -10,7 +10,7 @@ Sistem Pemantauan Pra-Berkas & Verifikasi Lapangan untuk Kantor Pertanahan Kabup
 - **Bahasa**: TypeScript
 - **Styling**: Tailwind CSS v4
 - **Database & ORM**: Turso (libSQL) & Drizzle ORM
-- **Autentikasi**: Cookie-based Session (Iron-session / Signed Cookies)
+- **Autentikasi**: Cookie sesi bertanda tangan HMAC, implementasi sendiri di src/lib/session.ts tanpa library iron-session
 
 ---
 
@@ -23,7 +23,7 @@ Sistem Pemantauan Pra-Berkas & Verifikasi Lapangan untuk Kantor Pertanahan Kabup
 | `npm run lint` | Menjalankan linter ESLint untuk memeriksa kebersihan kode. |
 | `npx tsc --noEmit` | Memeriksa validitas tipe TypeScript di seluruh proyek tanpa menghasilkan berkas output. |
 | `npx drizzle-kit push` | Menerapkan (push) skema dari `src/db/schema.ts` ke database target. **Peringatan**: Pastikan `.env` mengarah ke database yang sesuai sebelum menjalankan perintah ini. |
-| `npm run seed` *(atau `npx tsx src/db/seed.ts`)* | Mengisi data awal/sampel untuk pengujian lokal. **Peringatan Keras**: Hanya boleh dijalankan di environment lokal pengembangan dengan `ALLOW_SEED=true`. Dilarang keras dijalankan pada database production. |
+| `npx tsx src/db/seed.ts` | Mengisi data awal/sampel untuk pengujian lokal (tsx diunduh sementara oleh npx). **Peringatan Keras**: Hanya boleh dijalankan di environment lokal pengembangan dengan `ALLOW_SEED=true`. Dilarang keras dijalankan pada database production. |
 
 ---
 
