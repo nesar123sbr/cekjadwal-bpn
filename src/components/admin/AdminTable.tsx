@@ -514,7 +514,7 @@ export default function AdminTable({
 
   async function openHistory(row: AdminRow) {
     setError(null);
-    setVisitDateInput(new Date().toISOString().slice(0, 10));
+    setVisitDateInput(getTodayWib());
     setVisitNotesInput("");
     setLoadingVisits(true);
     setLoadingAuditLogs(true);
@@ -920,7 +920,7 @@ export default function AdminTable({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `rekap-berkas-bpn-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `rekap-berkas-bpn-${getTodayWib()}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1019,7 +1019,7 @@ export default function AdminTable({
                 }`}
               >
                 <span>Lihat Berkas Terlewat</span>
-                <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">
                   {overdueList.length}
                 </span>
               </button>
@@ -1051,7 +1051,7 @@ export default function AdminTable({
                 }`}
               >
                 <span>Lihat Jadwal Hari Ini</span>
-                <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">
                   {todayList.length}
                 </span>
               </button>
@@ -1196,7 +1196,7 @@ export default function AdminTable({
           >
             <span>Semua</span>
             <span
-              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                 selectedTab === "SEMUA"
                   ? "bg-white/20 text-white"
                   : "bg-gray-200 text-gray-700"
@@ -1216,7 +1216,7 @@ export default function AdminTable({
           >
             <span>Menunggu Dokumen</span>
             <span
-              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                 selectedTab === "MENUNGGU_DOKUMEN"
                   ? "bg-white/20 text-white"
                   : "bg-red-100 text-red-800"
@@ -1236,7 +1236,7 @@ export default function AdminTable({
           >
             <span>Verifikasi Petugas</span>
             <span
-              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                 selectedTab === "VERIFIKASI_PETUGAS"
                   ? "bg-white/20 text-white"
                   : "bg-amber-100 text-amber-800"
@@ -1256,7 +1256,7 @@ export default function AdminTable({
           >
             <span>Dijadwalkan</span>
             <span
-              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                 selectedTab === "DIJADWALKAN"
                   ? "bg-white/20 text-white"
                   : "bg-blue-100 text-blue-800"
@@ -1276,7 +1276,7 @@ export default function AdminTable({
           >
             <span>Selesai</span>
             <span
-              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                 selectedTab === "SELESAI"
                   ? "bg-white/20 text-white"
                   : "bg-emerald-100 text-emerald-800"
@@ -1299,7 +1299,7 @@ export default function AdminTable({
             >
               <span>⚠️ Terlewat</span>
               <span
-                className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                   selectedTab === "OVERDUE"
                     ? "bg-white/20 text-white"
                     : "bg-rose-200 text-rose-800"
@@ -1323,7 +1323,7 @@ export default function AdminTable({
             >
               <span>⏰ Hari Ini</span>
               <span
-                className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                   selectedTab === "TODAY"
                     ? "bg-white/20 text-white"
                     : "bg-amber-200 text-amber-900"
