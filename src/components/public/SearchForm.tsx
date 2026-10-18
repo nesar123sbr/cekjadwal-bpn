@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type SubmitEvent } from "react";
+import { useState, type SubmitEvent } from "react";
 import { searchTicket, type SearchResult } from "@/actions/search";
 
 type Props = {
@@ -23,7 +23,6 @@ export default function SearchForm({
   const [name, setName] = useState(initialName ?? "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const autoRan = useRef(false);
 
   async function run(t: string, n: string) {
     if (!t.trim() || !n.trim()) {
@@ -45,18 +44,6 @@ export default function SearchForm({
       setLoading(false);
     }
   }
-
-  // Auto-cari sekali saat halaman dibuka dari link QR (?ticket=...&name=...).
-  useEffect(() => {
-    if (autoRan.current) return;
-    autoRan.current = true;
-    if (initialTicket?.trim() && initialName?.trim()) {
-      queueMicrotask(() => {
-        void run(initialTicket, initialName);
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   function handleSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();

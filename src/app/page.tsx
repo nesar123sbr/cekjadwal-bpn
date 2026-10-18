@@ -3,6 +3,7 @@ import Link from "next/link";
 import BrandHeader from "@/components/BrandHeader";
 import PublicSearch from "@/components/public/PublicSearch";
 import TopographicBackground from "@/components/TopographicBackground";
+import { searchTicket, type SearchResult } from "@/actions/search";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -40,6 +41,19 @@ export default async function Home({
   const ticket = first(params.ticket);
   const name = first(params.name);
 
+  let initialResult: SearchResult | null = null;
+  const trimmedTicket = ticket?.trim();
+  const trimmedName = name?.trim();
+  if (trimmedTicket && trimmedName) {
+    const ticketNumber = trimmedTicket.slice(0, 100);
+    const applicantName = trimmedName.slice(0, 200);
+    try {
+      initialResult = await searchTicket({ ticketNumber, applicantName });
+    } catch {
+      initialResult = { status: "GANGGUAN_LAYANAN" };
+    }
+  }
+
   return (
     <div className="relative min-h-screen bg-slate-50 flex flex-col justify-between">
       {/* Background Kontur Topografi Halus */}
@@ -71,6 +85,7 @@ export default async function Home({
             key={`${ticket ?? ""}|${name ?? ""}`}
             initialTicket={ticket}
             initialName={name}
+            initialResult={initialResult}
           />
         </div>
 

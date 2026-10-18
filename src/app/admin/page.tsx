@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, min } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
 import AdminTable, { type AdminRow } from "@/components/admin/AdminTable";
@@ -30,7 +30,7 @@ export default async function AdminPage() {
     team,
     officerList,
     inactiveOfficerList,
-    allVisits,
+    visitAggregates,
     cancelledSchedules,
   ] = await Promise.all([
     db
@@ -44,9 +44,17 @@ export default async function AdminPage() {
         scheduleId: schedule_officers.schedule_id,
         officerId: officers.id,
         name: officers.name,
+        roleInTeam: schedule_officers.role_in_team,
       })
       .from(schedule_officers)
-      .innerJoin(officers, eq(schedule_officers.officer_id, officers.id)),
+      .innerJoin(officers, eq(schedule_officers.officer_id, officers.id))
+      .innerJoin(
+        schedules,
+        and(
+          eq(schedule_officers.schedule_id, schedules.id),
+          eq(schedules.status, "AKTIF"),
+        ),
+      ),
     db
       .select()
       .from(officers)
@@ -58,12 +66,12 @@ export default async function AdminPage() {
       .where(isNotNull(officers.deleted_at))
       .orderBy(asc(officers.name)),
     db
-      .select()
+      .select({
+        applicationId: application_visits.application_id,
+        firstVisit: min(application_visits.visit_date),
+      })
       .from(application_visits)
-      .orderBy(
-        asc(application_visits.visit_date),
-        asc(application_visits.created_at),
-      ),
+      .groupBy(application_visits.application_id),
     db
       .select({
         applicationId: schedules.application_id,
@@ -103,15 +111,66 @@ export default async function AdminPage() {
     }
   }
 
+  const firstVisitByAppId = new Map<string, string>();
+  for (const v of visitAggregates) {
+    if (v.firstVisit) {
+      firstVisitByAppId.set(v.applicationId, v.firstVisit);
+    }
+  }
+
+  const activeScheduleByAppId = new Map<
+    string,
+    (typeof activeSchedules)[number]
+  >();
+  for (const s of activeSchedules) {
+    activeScheduleByAppId.set(s.application_id, s);
+  }
+
+  type TeamMember = {
+    officerId: string;
+    name: string;
+    roleInTeam: string | null;
+  };
+  const rawTeamBySchedule = new Map<string, TeamMember[]>();
+  for (const member of team) {
+    const list = rawTeamBySchedule.get(member.scheduleId);
+    if (list) {
+      list.push(member);
+    } else {
+      rawTeamBySchedule.set(member.scheduleId, [member]);
+    }
+  }
+
+  const teamByScheduleId = new Map<
+    string,
+    { officerIds: string[]; officerNames: string[] }
+  >();
+  for (const [schedId, members] of rawTeamBySchedule.entries()) {
+    const leaders: TeamMember[] = [];
+    const others: TeamMember[] = [];
+    for (const m of members) {
+      if (m.roleInTeam === "Ketua Tim") {
+        leaders.push(m);
+      } else {
+        others.push(m);
+      }
+    }
+    const sorted = [...leaders, ...others];
+    teamByScheduleId.set(schedId, {
+      officerIds: sorted.map((t) => t.officerId),
+      officerNames: sorted.map((t) => t.name),
+    });
+  }
+
   const rows: AdminRow[] = apps.map((a) => {
-    const sch = activeSchedules.find((s) => s.application_id === a.id);
-    const appVisits = allVisits.filter((v) => v.application_id === a.id);
+    const sch = activeScheduleByAppId.get(a.id);
     const firstVisitDate =
-      appVisits[0]?.visit_date ?? a.created_at.slice(0, 10);
+      firstVisitByAppId.get(a.id) ?? a.created_at.slice(0, 10);
     const cancelInfo =
       a.status === "VERIFIKASI_PETUGAS"
         ? (cancelInfoByApp.get(a.id) ?? null)
         : null;
+    const teamInfo = sch ? teamByScheduleId.get(sch.id) : undefined;
 
     return {
       id: a.id,
@@ -131,12 +190,8 @@ export default async function AdminPage() {
       inspectionDate: sch?.inspection_date ?? null,
       inspectionTime: sch?.inspection_time ?? null,
       notes: sch?.notes_for_public ?? null,
-      officerIds: sch
-        ? team.filter((t) => t.scheduleId === sch.id).map((t) => t.officerId)
-        : [],
-      officerNames: sch
-        ? team.filter((t) => t.scheduleId === sch.id).map((t) => t.name)
-        : [],
+      officerIds: teamInfo?.officerIds ?? [],
+      officerNames: teamInfo?.officerNames ?? [],
       lastCancelCategory: cancelInfo?.category ?? null,
       lastCancelReason: cancelInfo?.reason ?? null,
       rescheduleCount: rescheduleCountByApp.get(a.id) ?? 0,

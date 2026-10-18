@@ -853,14 +853,27 @@ export default function AdminTable({
     });
   }, [rows, selectedTab, selectedDistrict, startDate, endDate, searchQuery]);
 
-  // Tab counts
-  const countAll = rows.length;
-  const countDocs = rows.filter((r) => r.status === "MENUNGGU_DOKUMEN").length;
-  const countVerify = rows.filter(
-    (r) => r.status === "VERIFIKASI_PETUGAS",
-  ).length;
-  const countScheduled = rows.filter((r) => r.status === "DIJADWALKAN").length;
-  const countDone = rows.filter((r) => r.status === "SELESAI").length;
+  // Tab counts (dihitung sekali jalan dengan useMemo)
+  const { countAll, countDocs, countVerify, countScheduled, countDone } =
+    useMemo(() => {
+      let docs = 0;
+      let verify = 0;
+      let scheduled = 0;
+      let done = 0;
+      for (const r of rows) {
+        if (r.status === "MENUNGGU_DOKUMEN") docs++;
+        else if (r.status === "VERIFIKASI_PETUGAS") verify++;
+        else if (r.status === "DIJADWALKAN") scheduled++;
+        else if (r.status === "SELESAI") done++;
+      }
+      return {
+        countAll: rows.length,
+        countDocs: docs,
+        countVerify: verify,
+        countScheduled: scheduled,
+        countDone: done,
+      };
+    }, [rows]);
 
   // Export CSV with UTF-8 BOM
   function handleExportCsv() {
@@ -1529,9 +1542,9 @@ export default function AdminTable({
                 <td className="px-4 py-3.5">
                   {r.officerNames.length > 0 ? (
                     <div className="flex flex-wrap gap-1 max-w-[190px]">
-                      {r.officerNames.map((name) => (
+                      {r.officerNames.map((name, idx) => (
                         <span
-                          key={name}
+                          key={r.officerIds[idx] ?? `${name}-${idx}`}
                           className="inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200"
                         >
                           {name}

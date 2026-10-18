@@ -78,8 +78,10 @@ function splitDocs(raw: string | null): string[] {
 
 export async function searchTicket(input: SearchInput): Promise<SearchResult> {
   try {
-    const normalized = normalizeTicketNumber(String(input.ticketNumber ?? ""));
-    const normalizedInputName = normalizeNameForMatch(String(input.applicantName ?? ""));
+    const rawTicket = String(input.ticketNumber ?? "").slice(0, 100);
+    const rawName = String(input.applicantName ?? "").slice(0, 200);
+    const normalized = normalizeTicketNumber(rawTicket);
+    const normalizedInputName = normalizeNameForMatch(rawName);
     if (!normalized || normalizedInputName.length < MIN_NAME_LENGTH) {
       return { status: "TIDAK_DITEMUKAN" };
     }

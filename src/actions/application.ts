@@ -157,15 +157,25 @@ export async function updateApplication(
         id: applications.id,
         ticket_number: applications.ticket_number,
         applicant_name: applications.applicant_name,
+        object_address: applications.object_address,
       })
       .from(applications)
       .where(and(eq(applications.id, id), isNull(applications.deleted_at)))
       .get();
     if (!oldApp) return { ok: false, error: "Berkas tidak ditemukan." };
 
+    const oldTicket = oldApp.ticket_number.trim();
+    const oldName = oldApp.applicant_name.trim();
+    const oldAddress = oldApp.object_address.trim();
+
     const isChanged =
-      oldApp.ticket_number !== ticketNumber ||
-      oldApp.applicant_name !== applicantName;
+      oldTicket !== ticketNumber ||
+      oldName !== applicantName ||
+      oldAddress !== objectAddress;
+
+    if (!isChanged) {
+      return { ok: true };
+    }
 
     const now = getNowWibIso();
     await db.transaction(async (tx) => {
@@ -179,18 +189,16 @@ export async function updateApplication(
         })
         .where(eq(applications.id, id));
 
-      if (isChanged) {
-        await tx.insert(audit_logs).values({
-          id: randomUUID(),
-          application_id: id,
-          action: "UPDATE_APPLICATION",
-          actor,
-          old_value: `${oldApp.ticket_number} | ${oldApp.applicant_name}`,
-          new_value: `${ticketNumber} | ${applicantName}`,
-          ip: null,
-          created_at: now,
-        });
-      }
+      await tx.insert(audit_logs).values({
+        id: randomUUID(),
+        application_id: id,
+        action: "UPDATE_APPLICATION",
+        actor,
+        old_value: `${oldTicket} | ${oldName} | ${oldAddress}`,
+        new_value: `${ticketNumber} | ${applicantName} | ${objectAddress}`,
+        ip: null,
+        created_at: now,
+      });
     });
 
     revalidatePath("/admin");

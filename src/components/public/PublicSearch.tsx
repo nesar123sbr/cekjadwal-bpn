@@ -8,11 +8,15 @@ import ScheduleResult from "@/components/public/ScheduleResult";
 export default function PublicSearch({
   initialTicket,
   initialName,
+  initialResult,
 }: {
   initialTicket?: string;
   initialName?: string;
+  initialResult?: SearchResult | null;
 }) {
-  const [result, setResult] = useState<SearchResult | null>(null);
+  const [result, setResult] = useState<SearchResult | null>(
+    initialResult ?? null,
+  );
 
   return (
     <>

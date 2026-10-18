@@ -2,9 +2,10 @@ import type { SearchResult, SearchResultItem } from "@/actions/search";
 import { formatIndoTime, getTodayWib } from "@/lib/utils";
 
 function formatDate(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
+  const d = new Date(`${iso}T00:00:00+07:00`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("id-ID", {
+    timeZone: "Asia/Jakarta",
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -13,9 +14,10 @@ function formatDate(iso: string): string {
 }
 
 function formatShortDate(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
+  const d = new Date(`${iso}T00:00:00+07:00`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("id-ID", {
+    timeZone: "Asia/Jakarta",
     day: "numeric",
     month: "long",
     year: "numeric",
