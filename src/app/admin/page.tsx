@@ -150,13 +150,13 @@ export default async function AdminPage() {
         <BrandHeader />
         <div className="border-b border-gray-200/90 bg-white/90 backdrop-blur-xs">
           <div className="mx-auto flex w-full max-w-[1536px] items-center justify-between px-3 sm:px-6 lg:px-8 py-3.5">
-            <h1 className="text-lg font-bold text-[#002B49]">
+            <h1 className="text-lg font-bold text-bpn-navy">
               Dashboard Loket - CekJadwal Pemeriksaan Tanah
             </h1>
             <form action={logoutAction}>
               <button
                 type="submit"
-                className="rounded-lg border border-[#002B49] px-3 py-1.5 text-sm text-[#002B49] hover:bg-slate-100 transition"
+                className="rounded-lg border border-bpn-navy px-3 py-1.5 text-sm text-bpn-navy hover:bg-slate-100 transition"
               >
                 Keluar (Logout)
               </button>

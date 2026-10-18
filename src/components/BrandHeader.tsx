@@ -6,7 +6,7 @@ export default function BrandHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="relative bg-[#002B49] text-white overflow-hidden">
+    <header className="relative bg-bpn-navy text-white overflow-hidden">
       {/* Ornamen Latar Belakang Kontur Topografi Halus (Topographic Contour Pattern) */}
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full opacity-15 overflow-hidden mix-blend-overlay"
@@ -57,7 +57,7 @@ export default function BrandHeader({
           className="h-12 w-12 sm:h-[52px] sm:w-[52px] shrink-0 object-contain drop-shadow-sm"
         />
         <div className="min-w-0 flex-1">
-          <p className="text-base font-bold uppercase leading-tight tracking-wide text-[#D4AF37] sm:text-xl">
+          <p className="text-base font-bold uppercase leading-tight tracking-wide text-bpn-gold sm:text-xl">
             Kantor Pertanahan Kabupaten Dairi
           </p>
           <p className="mt-0.5 text-xs font-normal leading-tight text-slate-200 sm:text-sm">
@@ -66,7 +66,7 @@ export default function BrandHeader({
         </div>
         {children}
       </div>
-      <div className="relative z-10 h-1 bg-linear-to-r from-[#D4AF37] via-[#F1D77A] to-[#D4AF37]" />
+      <div className="relative z-10 h-1 bg-linear-to-r from-bpn-gold via-bpn-gold-light to-bpn-gold" />
     </header>
   );
 }

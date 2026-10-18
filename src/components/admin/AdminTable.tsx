@@ -91,7 +91,7 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
 
 const DEFAULT_NOTES = "Harap patok batas terpasang";
 const inputCls =
-  "mt-1 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-2 focus:ring-[#002B49]/20 outline-none transition";
+  "mt-1 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs focus:border-bpn-navy focus:ring-2 focus:ring-bpn-navy/20 outline-none transition";
 
 type StatusTab = "SEMUA" | ApplicationStatus | "OVERDUE" | "TODAY";
 
@@ -919,7 +919,7 @@ export default function AdminTable({
       {/* Top Action Row */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[#002B49]">
+          <h2 className="text-2xl font-bold tracking-tight text-bpn-navy">
             Pemantauan Berkas Permohonan
           </h2>
           <p className="mt-0.5 text-xs text-gray-500">
@@ -931,10 +931,10 @@ export default function AdminTable({
           <button
             onClick={openOfficers}
             type="button"
-            className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/70 px-3.5 py-2 text-sm font-semibold text-[#002B49] shadow-xs hover:bg-blue-100 transition"
+            className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/70 px-3.5 py-2 text-sm font-semibold text-bpn-navy shadow-xs hover:bg-blue-100 transition"
           >
             <svg
-              className="h-4 w-4 text-[#002B49]"
+              className="h-4 w-4 text-bpn-navy"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -971,7 +971,7 @@ export default function AdminTable({
           <button
             onClick={openNew}
             type="button"
-            className="rounded-xl bg-[#002B49] px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-[#003d66] transition"
+            className="rounded-xl bg-bpn-navy px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-bpn-navy-light transition"
           >
             + Tambah Berkas Baru
           </button>
@@ -1072,7 +1072,7 @@ export default function AdminTable({
               placeholder="Cari No. Tiket, Pemohon, Alamat, atau Tanggal..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-9 text-sm text-gray-900 placeholder-gray-400 focus:border-[#002B49] focus:ring-2 focus:ring-[#002B49]/20 outline-none transition"
+              className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-9 text-sm text-gray-900 placeholder-gray-400 focus:border-bpn-navy focus:ring-2 focus:ring-bpn-navy/20 outline-none transition"
             />
             {searchQuery && (
               <button
@@ -1103,7 +1103,7 @@ export default function AdminTable({
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-1 focus:ring-[#002B49] outline-none"
+              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 shadow-xs focus:border-bpn-navy focus:ring-1 focus:ring-bpn-navy outline-none"
             />
           </div>
 
@@ -1116,7 +1116,7 @@ export default function AdminTable({
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-1 focus:ring-[#002B49] outline-none"
+              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 shadow-xs focus:border-bpn-navy focus:ring-1 focus:ring-bpn-navy outline-none"
             />
           </div>
 
@@ -1128,7 +1128,7 @@ export default function AdminTable({
             <select
               value={selectedDistrict}
               onChange={(e) => setSelectedDistrict(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-1 focus:ring-[#002B49] outline-none"
+              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 shadow-xs focus:border-bpn-navy focus:ring-1 focus:ring-bpn-navy outline-none"
             >
               <option value="SEMUA">Semua Kecamatan</option>
               {districtOptions.map((d) => (
@@ -1177,7 +1177,7 @@ export default function AdminTable({
             onClick={() => setSelectedTab("SEMUA")}
             className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
               selectedTab === "SEMUA"
-                ? "bg-[#002B49] text-white shadow-xs"
+                ? "bg-bpn-navy text-white shadow-xs"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
@@ -1197,7 +1197,7 @@ export default function AdminTable({
             onClick={() => setSelectedTab("MENUNGGU_DOKUMEN")}
             className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
               selectedTab === "MENUNGGU_DOKUMEN"
-                ? "bg-[#002B49] text-white shadow-xs"
+                ? "bg-bpn-navy text-white shadow-xs"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
@@ -1217,7 +1217,7 @@ export default function AdminTable({
             onClick={() => setSelectedTab("VERIFIKASI_PETUGAS")}
             className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
               selectedTab === "VERIFIKASI_PETUGAS"
-                ? "bg-[#002B49] text-white shadow-xs"
+                ? "bg-bpn-navy text-white shadow-xs"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
@@ -1237,7 +1237,7 @@ export default function AdminTable({
             onClick={() => setSelectedTab("DIJADWALKAN")}
             className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
               selectedTab === "DIJADWALKAN"
-                ? "bg-[#002B49] text-white shadow-xs"
+                ? "bg-bpn-navy text-white shadow-xs"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
@@ -1257,7 +1257,7 @@ export default function AdminTable({
             onClick={() => setSelectedTab("SELESAI")}
             className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
               selectedTab === "SELESAI"
-                ? "bg-[#002B49] text-white shadow-xs"
+                ? "bg-bpn-navy text-white shadow-xs"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
@@ -1359,7 +1359,7 @@ export default function AdminTable({
               >
                 {/* 1. NO. TIKET & TGL MASUK */}
                 <td className="px-4 py-3.5 whitespace-nowrap">
-                  <div className="font-bold text-[#002B49] text-sm leading-tight">
+                  <div className="font-bold text-bpn-navy text-sm leading-tight">
                     {r.ticketNumber}
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
@@ -1876,7 +1876,7 @@ export default function AdminTable({
               </h2>
               <p className="mt-0.5 text-xs text-gray-600">
                 No. Tiket:{" "}
-                <strong className="text-[#002B49]">
+                <strong className="text-bpn-navy">
                   {dialog.row.ticketNumber}
                 </strong>{" "}
                 · Pemohon: <strong>{dialog.row.applicantName}</strong>
@@ -1929,7 +1929,7 @@ export default function AdminTable({
                 <button
                   type="submit"
                   disabled={loadingVisits}
-                  className="rounded-lg bg-[#002B49] px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#003d66] disabled:opacity-60 transition"
+                  className="rounded-lg bg-bpn-navy px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-bpn-navy-light disabled:opacity-60 transition"
                 >
                   {loadingVisits ? "Menyimpan..." : "Tambah Catatan"}
                 </button>
@@ -1956,7 +1956,7 @@ export default function AdminTable({
                       key={v.id}
                       className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-xs"
                     >
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold text-[#002B49]">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold text-bpn-navy">
                         {visitLogs.length - idx}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -2271,7 +2271,7 @@ export default function AdminTable({
                         type="checkbox"
                         checked={selectedOfficers.includes(o.id)}
                         onChange={() => toggleOfficer(o.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-[#002B49] focus:ring-[#002B49]"
+                        className="h-4 w-4 rounded border-gray-300 text-bpn-navy focus:ring-bpn-navy"
                       />
                       {o.name}{" "}
                       <span className="text-gray-500">({o.position})</span>
@@ -2526,7 +2526,7 @@ export default function AdminTable({
                     value="PEMOHON_ABSEN"
                     checked={cancelCategory === "PEMOHON_ABSEN"}
                     onChange={() => setCancelCategory("PEMOHON_ABSEN")}
-                    className="mt-0.5 h-4 w-4 text-[#002B49] focus:ring-[#002B49]"
+                    className="mt-0.5 h-4 w-4 text-bpn-navy focus:ring-bpn-navy"
                   />
                   <div className="text-xs">
                     <p className="font-semibold text-gray-900">
@@ -2545,7 +2545,7 @@ export default function AdminTable({
                     value="PETUGAS_HALANGAN"
                     checked={cancelCategory === "PETUGAS_HALANGAN"}
                     onChange={() => setCancelCategory("PETUGAS_HALANGAN")}
-                    className="mt-0.5 h-4 w-4 text-[#002B49] focus:ring-[#002B49]"
+                    className="mt-0.5 h-4 w-4 text-bpn-navy focus:ring-bpn-navy"
                   />
                   <div className="text-xs">
                     <p className="font-semibold text-gray-900">
@@ -2564,7 +2564,7 @@ export default function AdminTable({
                     value="LAINNYA"
                     checked={cancelCategory === "LAINNYA"}
                     onChange={() => setCancelCategory("LAINNYA")}
-                    className="mt-0.5 h-4 w-4 text-[#002B49] focus:ring-[#002B49]"
+                    className="mt-0.5 h-4 w-4 text-bpn-navy focus:ring-bpn-navy"
                   />
                   <div className="text-xs">
                     <p className="font-semibold text-gray-900">
@@ -2629,7 +2629,7 @@ export default function AdminTable({
                 <label
                   className={`flex items-center gap-2.5 rounded-xl border p-3 cursor-pointer transition text-xs ${
                     cancelFollowUp === "CANCEL"
-                      ? "border-[#002B49] bg-blue-50/50 font-semibold text-gray-900"
+                      ? "border-bpn-navy bg-blue-50/50 font-semibold text-gray-900"
                       : "border-gray-200 hover:bg-gray-50 text-gray-700"
                   }`}
                 >
@@ -2639,7 +2639,7 @@ export default function AdminTable({
                     value="CANCEL"
                     checked={cancelFollowUp === "CANCEL"}
                     onChange={() => setCancelFollowUp("CANCEL")}
-                    className="h-4 w-4 text-[#002B49] focus:ring-[#002B49]"
+                    className="h-4 w-4 text-bpn-navy focus:ring-bpn-navy"
                   />
                   <span>Kembalikan ke antrean verifikasi</span>
                 </label>
@@ -2647,7 +2647,7 @@ export default function AdminTable({
                 <label
                   className={`flex items-center gap-2.5 rounded-xl border p-3 cursor-pointer transition text-xs ${
                     cancelFollowUp === "RESCHEDULE"
-                      ? "border-[#002B49] bg-blue-50/50 font-semibold text-gray-900"
+                      ? "border-bpn-navy bg-blue-50/50 font-semibold text-gray-900"
                       : "border-gray-200 hover:bg-gray-50 text-gray-700"
                   }`}
                 >
@@ -2657,7 +2657,7 @@ export default function AdminTable({
                     value="RESCHEDULE"
                     checked={cancelFollowUp === "RESCHEDULE"}
                     onChange={() => setCancelFollowUp("RESCHEDULE")}
-                    className="h-4 w-4 text-[#002B49] focus:ring-[#002B49]"
+                    className="h-4 w-4 text-bpn-navy focus:ring-bpn-navy"
                   />
                   <span>Tetapkan jadwal baru sekarang</span>
                 </label>
@@ -2741,7 +2741,7 @@ export default function AdminTable({
                             type="checkbox"
                             checked={rescheduleOfficers.includes(o.id)}
                             onChange={() => toggleRescheduleOfficer(o.id)}
-                            className="h-4 w-4 rounded border-gray-300 text-[#002B49] focus:ring-[#002B49]"
+                            className="h-4 w-4 rounded border-gray-300 text-bpn-navy focus:ring-bpn-navy"
                           />
                           <span>
                             {o.name}{" "}
@@ -2936,7 +2936,7 @@ export default function AdminTable({
                     placeholder="Contoh: Budi Santoso, S.T."
                     value={officerNameInput}
                     onChange={(e) => setOfficerNameInput(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-2 focus:ring-[#002B49]/20 outline-none transition"
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 shadow-xs focus:border-bpn-navy focus:ring-2 focus:ring-bpn-navy/20 outline-none transition"
                   />
                 </div>
                 <div>
@@ -2953,7 +2953,7 @@ export default function AdminTable({
                     placeholder="Contoh: Petugas Ukur Seksi Survei & Pemetaan"
                     value={officerPositionInput}
                     onChange={(e) => setOfficerPositionInput(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 shadow-xs focus:border-[#002B49] focus:ring-2 focus:ring-[#002B49]/20 outline-none transition"
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 shadow-xs focus:border-bpn-navy focus:ring-2 focus:ring-bpn-navy/20 outline-none transition"
                   />
                 </div>
               </div>
@@ -2961,7 +2961,7 @@ export default function AdminTable({
                 <button
                   type="submit"
                   disabled={officerPending}
-                  className="rounded-lg bg-[#002B49] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#003d66] disabled:opacity-60 transition"
+                  className="rounded-lg bg-bpn-navy px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-bpn-navy-light disabled:opacity-60 transition"
                 >
                   {officerPending ? "Menyimpan..." : "+ Tambah Petugas"}
                 </button>
@@ -3121,7 +3121,7 @@ function FormFooter({
         <button
           type="submit"
           disabled={isSubmitDisabled}
-          className="rounded-xl bg-[#002B49] px-4 py-2 text-sm font-semibold text-white hover:bg-[#003d66] disabled:opacity-60 transition shadow-xs"
+          className="rounded-xl bg-bpn-navy px-4 py-2 text-sm font-semibold text-white hover:bg-bpn-navy-light disabled:opacity-60 transition shadow-xs"
         >
           {pending ? "Menyimpan..." : submitLabel}
         </button>

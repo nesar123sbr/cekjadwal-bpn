@@ -12,7 +12,7 @@ type Props = {
 const MIN_NAME = 3;
 
 const inputCls =
-  "w-full rounded-xl border border-gray-300 bg-white px-4 py-4 text-lg text-gray-900 shadow-sm outline-none placeholder:text-gray-400 focus:border-[#002B49] focus:ring-2 focus:ring-[#D4AF37]/50";
+  "w-full rounded-xl border border-gray-300 bg-white px-4 py-4 text-lg text-gray-900 shadow-sm outline-none placeholder:text-gray-400 focus:border-bpn-navy focus:ring-2 focus:ring-bpn-gold/50";
 
 export default function SearchForm({
   onResult,
@@ -116,7 +116,7 @@ export default function SearchForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl bg-[#002B49] px-4 py-4 text-lg font-semibold text-white shadow-sm transition hover:bg-[#003d66] disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-xl bg-bpn-navy px-4 py-4 text-lg font-semibold text-white shadow-sm transition hover:bg-bpn-navy-light disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading ? "Mencari..." : "Cek Berkas"}
       </button>

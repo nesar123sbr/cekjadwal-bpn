@@ -20,7 +20,7 @@ export default function ErrorBoundary({
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 text-2xl shadow-inner">
           ⚠️
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-[#002B49] sm:text-2xl">
+        <h1 className="text-xl font-bold tracking-tight text-bpn-navy sm:text-2xl">
           Terjadi Kendala Sistem
         </h1>
         <p className="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
@@ -37,7 +37,7 @@ export default function ErrorBoundary({
           <button
             type="button"
             onClick={() => reset()}
-            className="w-full sm:w-auto rounded-xl bg-[#002B49] px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-[#003d66] transition cursor-pointer"
+            className="w-full sm:w-auto rounded-xl bg-bpn-navy px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-bpn-navy-light transition cursor-pointer"
           >
             Muat Ulang Halaman
           </button>

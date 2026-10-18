@@ -58,7 +58,7 @@ export default async function Home({
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200/80">
               Layanan Pra-Berkas Mandiri
             </span>
-            <h1 className="mt-3 text-2xl font-bold tracking-tight text-[#002B49] sm:text-3xl">
+            <h1 className="mt-3 text-2xl font-bold tracking-tight text-bpn-navy sm:text-3xl">
               Cek Jadwal Pemeriksaan Tanah Anda
             </h1>
             <p className="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">

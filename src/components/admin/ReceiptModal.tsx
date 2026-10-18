@@ -57,7 +57,7 @@ export default function ReceiptModal({
     >
       <div className="w-full max-w-lg rounded-t-2xl bg-white p-5 sm:rounded-2xl">
         <article id="receipt-sheet" className="space-y-4 text-gray-900">
-          <header className="border-b-2 border-[#D4AF37] pb-3 text-center">
+          <header className="border-b-2 border-bpn-gold pb-3 text-center">
             <div className="mb-2 flex justify-center">
               <Image
                 src="/logo-bpn.svg"
@@ -68,7 +68,7 @@ export default function ReceiptModal({
                 className="h-12 w-12 object-contain"
               />
             </div>
-            <p className="text-sm font-bold uppercase text-[#002B49]">
+            <p className="text-sm font-bold uppercase text-bpn-navy">
               Kantor Pertanahan Kabupaten Dairi
             </p>
             <h2 id="receipt-title" className="mt-2 text-lg font-bold">
@@ -107,7 +107,7 @@ export default function ReceiptModal({
           <button
             type="button"
             onClick={() => window.print()}
-            className="rounded-lg bg-[#002B49] px-4 py-2 text-sm font-semibold text-white hover:bg-[#003d66]"
+            className="rounded-lg bg-bpn-navy px-4 py-2 text-sm font-semibold text-white hover:bg-bpn-navy-light"
           >
             Cetak / Print
           </button>

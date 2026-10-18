@@ -21,7 +21,7 @@ export default function LoginForm() {
           autoComplete="username"
           required
           placeholder="Masukkan username"
-          className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 text-sm text-gray-900 shadow-xs outline-none placeholder:text-gray-400 focus:border-[#002B49] focus:ring-2 focus:ring-[#D4AF37]/50 transition"
+          className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 text-sm text-gray-900 shadow-xs outline-none placeholder:text-gray-400 focus:border-bpn-navy focus:ring-2 focus:ring-bpn-gold/50 transition"
         />
       </div>
       <div>
@@ -35,7 +35,7 @@ export default function LoginForm() {
           autoComplete="current-password"
           required
           placeholder="Masukkan password"
-          className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 text-sm text-gray-900 shadow-xs outline-none placeholder:text-gray-400 focus:border-[#002B49] focus:ring-2 focus:ring-[#D4AF37]/50 transition"
+          className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 text-sm text-gray-900 shadow-xs outline-none placeholder:text-gray-400 focus:border-bpn-navy focus:ring-2 focus:ring-bpn-gold/50 transition"
         />
       </div>
       {state.error && (
@@ -49,7 +49,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-xl bg-[#002B49] py-3.5 font-semibold text-white transition hover:bg-[#003d66] disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-xl bg-bpn-navy py-3.5 font-semibold text-white transition hover:bg-bpn-navy-light disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Masuk..." : "Masuk"}
       </button>

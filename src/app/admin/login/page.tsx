@@ -31,7 +31,7 @@ export default async function AdminLoginPage() {
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200/80">
                 Akses Internal Petugas Loket
               </span>
-              <h1 className="mt-3 text-2xl font-bold tracking-tight text-[#002B49]">
+              <h1 className="mt-3 text-2xl font-bold tracking-tight text-bpn-navy">
                 Login Petugas Loket
               </h1>
               <p className="mt-1 text-xs sm:text-sm text-gray-600">
@@ -44,7 +44,7 @@ export default async function AdminLoginPage() {
           <div className="mt-4 text-center">
             <Link
               href="/"
-              className="text-xs text-gray-500 hover:text-[#002B49] transition underline-offset-4 hover:underline"
+              className="text-xs text-gray-500 hover:text-bpn-navy transition underline-offset-4 hover:underline"
             >
               ← Kembali ke Halaman Cek Jadwal
             </Link>
