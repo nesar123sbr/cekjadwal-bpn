@@ -10,11 +10,11 @@
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
-    "drizzle-orm": "^0.45.3",
-    "next": "16.3.8",
+    "drizzle-orm": "^0.45.4",
+    "next": "16.4.2",
     "qrcode.react": "^4.2.0",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -23,7 +23,7 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
