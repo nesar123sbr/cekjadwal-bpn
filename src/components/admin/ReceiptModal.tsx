@@ -35,7 +35,7 @@ function Row({
 }) {
   return (
     <tr className="align-top">
-      <td className="w-44 py-1.5 pr-2">{label}</td>
+      <td className="w-48 py-1.5 pr-2">{label}</td>
       <td className="w-4 py-1.5 text-center">:</td>
       <td className="py-1.5">{children}</td>
     </tr>
@@ -59,47 +59,57 @@ export default function ReceiptModal({
       aria-labelledby="receipt-title"
       className="receipt-portal fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 sm:items-center sm:p-4"
     >
-      <div className="w-full max-w-xl rounded-t-2xl bg-white p-5 sm:rounded-2xl sm:p-6">
+      <div className="w-full max-w-2xl rounded-t-2xl bg-white p-5 sm:rounded-2xl sm:p-6">
         <article
           id="receipt-sheet"
           className="text-sm text-black print:text-[11pt]"
           style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
         >
-          {/* KOP SURAT */}
-          <header className="flex items-center gap-3 pb-3">
+          {/* KOP SURAT RESMI BAGIAN TU KANTOR PERTANAHAN KABUPATEN DAIRI */}
+          <header className="flex items-center gap-3 pb-2.5 print:gap-[4mm]">
             <Image
               src="/logo-bpn.svg"
               alt="Logo ATR/BPN"
-              width={64}
-              height={64}
+              width={112}
+              height={112}
               preload
-              className="h-16 w-16 shrink-0 object-contain"
+              className="h-20 w-20 shrink-0 object-contain print:h-[27mm] print:w-[27mm]"
             />
-            <div className="flex-1 text-center leading-snug">
-              <p className="text-xs font-bold uppercase print:text-[10pt]">
-                Kementerian Agraria dan Tata Ruang /
+            <div
+              className="min-w-0 flex-1 text-center"
+              style={{
+                fontFamily:
+                  "'Times New Roman', Times, 'Liberation Serif', serif",
+              }}
+            >
+              <p className="text-sm font-bold uppercase leading-tight print:text-[14pt]">
+                KEMENTERIAN AGRARIA DAN TATA RUANG/
               </p>
-              <p className="text-xs font-bold uppercase print:text-[10pt]">
-                Badan Pertanahan Nasional
+              <p className="text-sm font-bold uppercase leading-tight print:text-[14pt]">
+                BADAN PERTANAHAN NASIONAL
               </p>
-              <p className="mt-0.5 text-base font-extrabold uppercase print:text-[13pt]">
-                Kantor Pertanahan Kabupaten Dairi
+              <p className="mt-0.5 text-xs font-normal uppercase leading-tight print:text-[12pt]">
+                KANTOR PERTANAHAN KABUPATEN DAIRI
               </p>
-              <p className="mt-0.5 text-[11px] print:text-[9pt]">
-                Provinsi Sumatera Utara
+              <p className="text-xs font-normal uppercase leading-tight print:text-[12pt]">
+                PROVINSI SUMATERA UTARA
+              </p>
+              <p
+                className="mt-1 text-[10px] font-normal leading-tight print:text-[8.5pt] print:whitespace-nowrap"
+                style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
+              >
+                Jalan Sisingamangaraja No. 134 Sidikalang 22211 Telp. (0627)
+                2521276 <em>email</em> : kab-dairi@atrbpn.go.id
               </p>
             </div>
-            {/* Penyeimbang lebar logo agar teks kop benar-benar di tengah halaman */}
-            <div className="h-16 w-16 shrink-0" aria-hidden="true" />
           </header>
-          <div className="border-t-[3px] border-black" />
-          <div className="mt-[2px] border-t border-black" />
+          <div className="border-t-[2.5px] border-black" />
 
           {/* JUDUL */}
           <div className="mt-5 text-center">
             <h2
               id="receipt-title"
-              className="inline-block border-b-2 border-black pb-0.5 text-base font-extrabold uppercase tracking-wide print:text-[13pt]"
+              className="inline-block border-b-2 border-black pb-0.5 text-base font-extrabold uppercase tracking-wide print:text-[12.5pt]"
             >
               Tanda Terima Registrasi Pra-Berkas
             </h2>
