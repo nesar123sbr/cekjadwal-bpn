@@ -2054,7 +2054,7 @@ export default function AdminTable({
               Edit Identitas Berkas
             </h2>
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-              Mengubah nomor tiket atau nama membuat QR pada tanda terima yang sudah dicetak tidak lagi menemukan berkas ini. Cetak ulang tanda terima bila perlu.
+              Mengubah nomor tiket atau nama membuat data pada lembar tanda terima yang sudah dicetak tidak lagi sesuai. Cetak ulang tanda terima bila perlu.
             </div>
             <div>
               <label
