@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import type { ReceiptData } from "@/actions/application";
@@ -65,46 +64,6 @@ export default function ReceiptModal({
           className="text-sm text-black print:text-[11pt]"
           style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
         >
-          {/* KOP SURAT RESMI BAGIAN TU KANTOR PERTANAHAN KABUPATEN DAIRI */}
-          <header className="flex items-center gap-3 pb-2.5 print:gap-[4mm]">
-            <Image
-              src="/logo-bpn.svg"
-              alt="Logo ATR/BPN"
-              width={112}
-              height={112}
-              preload
-              className="h-20 w-20 shrink-0 object-contain print:h-[27mm] print:w-[27mm]"
-            />
-            <div
-              className="min-w-0 flex-1 text-center"
-              style={{
-                fontFamily:
-                  "'Times New Roman', Times, 'Liberation Serif', serif",
-              }}
-            >
-              <p className="text-sm font-bold uppercase leading-tight print:text-[14pt]">
-                KEMENTERIAN AGRARIA DAN TATA RUANG/
-              </p>
-              <p className="text-sm font-bold uppercase leading-tight print:text-[14pt]">
-                BADAN PERTANAHAN NASIONAL
-              </p>
-              <p className="mt-0.5 text-xs font-normal uppercase leading-tight print:text-[12pt]">
-                KANTOR PERTANAHAN KABUPATEN DAIRI
-              </p>
-              <p className="text-xs font-normal uppercase leading-tight print:text-[12pt]">
-                PROVINSI SUMATERA UTARA
-              </p>
-              <p
-                className="mt-1 text-[10px] font-normal leading-tight print:text-[8.5pt] print:whitespace-nowrap"
-                style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
-              >
-                Jalan Sisingamangaraja No. 134 Sidikalang 22211 Telp. (0627)
-                2521276 <em>email</em> : kab-dairi@atrbpn.go.id
-              </p>
-            </div>
-          </header>
-          <div className="border-t-[2.5px] border-black" />
-
           {/* JUDUL */}
           <div className="mt-5 text-center">
             <h2
@@ -115,14 +74,8 @@ export default function ReceiptModal({
             </h2>
           </div>
 
-          {/* KALIMAT PENGANTAR */}
-          <p className="mt-4 leading-relaxed">
-            Telah diterima berkas permohonan pada loket pelayanan Kantor
-            Pertanahan Kabupaten Dairi dengan rincian sebagai berikut:
-          </p>
-
           {/* RINCIAN (TITIK DUA SEJAJAR) */}
-          <table className="mt-3 w-full border-collapse">
+          <table className="mt-5 w-full border-collapse">
             <tbody>
               <Row label="Nomor Tiket / Registrasi">
                 <span className="text-lg font-extrabold tracking-wide print:text-[14pt]">
